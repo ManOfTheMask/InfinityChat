@@ -1,0 +1,1 @@
+console.log('This is the page 2 script for the public directory.');

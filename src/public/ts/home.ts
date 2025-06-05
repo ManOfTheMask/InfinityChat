@@ -1,0 +1,1 @@
+console.log('This is the home script for the public directory.');
