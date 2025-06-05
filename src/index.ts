@@ -11,11 +11,11 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Serve the index.html for / route
 app.get('/', (req: Request, res: Response) => {
-    res.sendFile(path.join(__dirname, 'public','pages', 'index.html'));
-    });
+    res.sendFile(path.join(__dirname, 'public','pages', 'home.html'));
+});
 
-app.get('/page2', (req: Request, res: Response) => {
-    res.sendFile(path.join(__dirname, 'public', 'pages', 'page2.html'));
+app.get('/profile', (req: Request, res: Response) => {
+    res.sendFile(path.join(__dirname, 'public', 'pages', 'profile.html'));
 });
 
 // You can still add other API routes if needed, for example:

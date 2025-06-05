@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../css/output.css">
+    <title>Home Page</title>
+</head>
+
+
+
+<body class="bg-base-300 w-screen h-screen">
+    <div class="navbar bg-base-100 shadow-sm">
+    <div class="flex-1">
+        <a href="/" class="btn btn-ghost text-xl">daisyUI</a>
+    </div>
+    <div class="flex-none">
+        <ul class="menu menu-horizontal px-1">
+        <li><a>Link</a></li>
+            <li>
+                <details>
+                    <summary>Parent</summary>
+                    <ul class="bg-base-100 rounded-t-none p-2">
+                        <li><a>Link 1</a></li>
+                        <li><a href="/profile">Link 2</a></li>
+                    </ul>
+                </details>
+            </li>
+        </ul>
+    </div>
+    </div>
+    <div class="flex flex-col items-center justify-center w-screen h-screen">
+        <h1 class="text-base-content text-4xl">Welcome to Infinity Chat!</h1>
+        <p class="text-base-content">A PGP based chat app that encrypts you messages, deletes them after some time, and we don't store private keys</p>
+        <p>Get real</p>
+    </div>
+    <div id="message-container"></div>
+    <!-- The compiled JavaScript will be served from /js/index.js -->
+    <script type="module" src="../js/home.js"></script>
+</body>
+</html>
