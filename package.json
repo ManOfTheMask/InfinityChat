@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "clean": "rm -rf dist", 
-    "copy-static": "cpx 'src/public/**' dist/public", 
-    "copy-static:watch": "cpx './src/public/**' ./dist/public --watch", 
+    "clean": "rm -rf dist",
+    "copy-static": "cpx 'src/public/**' dist/public",
+    "copy-static:watch": "cpx './src/public/**' ./dist/public --watch",
     "build": "npm run clean && tsc --build && npm run copy-static && npx tailwindcss -i ./src/public/css/input.css -o ./dist/public/css/output.css --minify",
     "start": "node dist/index.js",
     "dev": "npm run clean && tsc --build && concurrently \"tsc --build --watch\" \"npm run copy-static:watch\" \"npx tailwindcss -i ./src/public/css/input.css -o ./dist/public/css/output.css --watch\" \"nodemon ./dist/index.js\""
@@ -16,13 +16,14 @@
   "description": "",
   "dependencies": {
     "@tailwindcss/cli": "^4.1.8",
-    "concurrently": "^9.1.2",
     "express": "^5.1.0",
     "tailwindcss": "^4.1.8"
   },
   "devDependencies": {
     "@types/express": "^5.0.2",
     "@types/node": "^22.15.29",
+    "concurrently": "^9.1.2",
+    "cpx2": "^8.0.0",
     "nodemon": "^3.1.10",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3"
