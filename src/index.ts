@@ -1,9 +1,15 @@
 // src/index.ts
 import express, { Request, Response } from 'express';
 import path from 'path'; // Import the 'path' module
+import { engine } from 'express-handlebars'; // Import express-handlebars
 
 const app = express();
 const port = process.env.PORT || 3000;
+
+// Set up Handlebars as the template engine
+app.engine('handlebars', engine());
+app.set('view engine', 'handlebars');
+app.set('views', path.join(__dirname, 'public' ,'views'));
 
 // Serve static files from the 'src/public' directory
 // The path.join() method is used to construct a platform-specific path.
@@ -11,11 +17,11 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Serve the index.html for / route
 app.get('/', (req: Request, res: Response) => {
-    res.sendFile(path.join(__dirname, 'public','pages', 'home.html'));
+    res.render('home', { title: 'Home' });
 });
 
 app.get('/profile', (req: Request, res: Response) => {
-    res.sendFile(path.join(__dirname, 'public', 'pages', 'profile.html'));
+    res.render('profile', { title: 'Profile' });
 });
 
 // You can still add other API routes if needed, for example:

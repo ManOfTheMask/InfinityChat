@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/css/output.css">
+    <title>{{title}}</title>
+</head>
+<body class="bg-base-300">
+    <header>
+        <nav class="navbar bg-base-100 shadow-sm">
+            <div class="flex-1">
+                <a href="/" class="btn btn-ghost text-xl">Infinity Chat</a>
+            </div>
+            <div class="flex-none">
+                <ul class="menu menu-horizontal px-1">
+                    <li>
+                        <details>
+                            <summary>Menu</summary>
+                            <ul class="bg-base-100 rounded-t-none p-2">
+                                <li><a href="/">Home</a></li>
+                                <li><a href="/profile">Profile</a></li>
+                            </ul>
+                        </details>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+    </header>
+    <main>
+        {{{body}}}
+    </main>
+    <footer>
+        <p class="text-center">© 2023 Infinity Chat. All rights reserved.</p>
+    </footer>
+    <script type="module" src="/js/home.js"></script>
+</body>
+</html>
