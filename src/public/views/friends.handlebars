@@ -1,0 +1,30 @@
+<div class="flex flex-col items-center justify-center w-screen h-screen relative">
+
+    <button id="addFriendBtn" class="btn btn-primary mb-4 absolute top-8 right-8 z-20">Add Friend</button>
+
+    <!-- Modal Overlay -->
+    <div id="addFriendModal" class="fixed inset-0 bg-transparent flex items-center justify-center z-50 hidden">
+        <div class="bg-base-100 p-8 rounded-lg shadow-lg w-96 opacity-100 blur-none">
+            <h2 class="text-2xl mb-4">Add a Friend</h2>
+            <input id="publicKeyInput" type="text" placeholder="Enter public key..." class="input input-bordered w-full mb-4" />
+            <div class="flex justify-end">
+                <button id="closeModalBtn" class="btn btn-secondary mr-2">Cancel</button>
+                <button class="btn btn-primary">Add</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="mainContent" class="bg-base-200 shadow-lg p-8 rounded-lg text-center w-9/10 h-4/5 overflow-y-auto transition-all duration-300">
+        <h1 class="text-base-content text-4xl mb-4">Friends List</h1>
+        <p class="text-base-content text-lg mb-4">Here you can see your friends and their public keys.</p>
+        <ul class="list-disc list-inside text-center scroll-auto">
+            {{#each friends}}
+                <li class="text-base-content list-none">{{this.username}} - Public Key: {{this.publicKey}}</li>
+            {{else}}
+                <li class="text-base-content list-none">No friends added yet.</li>
+            {{/each}}
+        </ul>
+    </div>
+</div>
+
+<script type="module" src="../js/friends.js"></script>
