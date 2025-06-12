@@ -17,20 +17,26 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Serve the index.html for / route
 app.get('/', (req: Request, res: Response) => {
-    res.render('home', { title: 'Home' });
+    res.render('home', { title: 'Home', script: 'home' });
 });
 
 app.get('/profile', (req: Request, res: Response) => {
-    res.render('profile', { title: 'Profile' });
+    res.render('profile', { title: 'Profile', script: 'profile' });
 });
 
 app.get('/friends', (req: Request, res: Response) => {
-    res.render('friends', { title: 'Friends List' });
+    res.render('friends', { title: 'Friends List', script: 'friends' });
 });
+
+app.get('/test', (req: Request, res: Response) => {
+    res.render('test', { title: 'Test PGP', script: 'test' });
+});
+
 // You can still add other API routes if needed, for example:
 app.get('/api/data', (req: Request, res: Response) => {
   res.json({ message: 'This is an API endpoint!' });
 });
+
 
 app.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);

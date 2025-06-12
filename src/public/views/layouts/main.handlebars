@@ -34,6 +34,9 @@
     <footer class="bg-base-100 p-4">
         <p class="text-center">Infinity Chat made by V01D</p>
     </footer>
-    <script type="module" src="/js/home.js"></script>
+    {{!-- Only load the page-specific JS, not PGPUtils.js directly --}}
+    {{#if script}}
+      <script type="module" src="/js/{{script}}.js"></script>
+    {{/if}}
 </body>
 </html>

@@ -6,9 +6,10 @@
     "clean": "rm -rf dist",
     "copy-static": "cpx 'src/public/**' dist/public",
     "copy-static:watch": "cpx './src/public/**' ./dist/public --watch",
-    "build": "npm run clean && tsc --build && npm run copy-static && npx tailwindcss -i ./src/public/css/input.css -o ./dist/public/css/output.css --minify",
+    "build": "vite build && npx tailwindcss -i ./src/public/css/input.css -o ./dist/public/css/output.css --minify && npm run copy-static",
+    "build:watch": "vite build --watch && npx tailwindcss -i ./src/public/css/input.css -o ./dist/public/css/output.css --watch",
     "start": "node dist/index.js",
-    "dev": "npm run clean && tsc --build && concurrently \"tsc --build --watch\" \"npm run copy-static:watch\" \"npx tailwindcss -i ./src/public/css/input.css -o ./dist/public/css/output.css --watch\" \"nodemon ./dist/index.js\""
+    "dev": "npm run clean && tsc --build && concurrently \"npm run build:watch\" \"npm run copy-static:watch\" \"npx tailwindcss -i ./src/public/css/input.css -o ./dist/public/css/output.css --watch\" \"nodemon ./dist/index.js\""
   },
   "keywords": [],
   "author": "",
@@ -18,6 +19,7 @@
     "@tailwindcss/cli": "^4.1.8",
     "express": "^5.1.0",
     "express-handlebars": "^8.0.3",
+    "openpgp": "^6.1.1",
     "tailwindcss": "^4.1.8"
   },
   "devDependencies": {
@@ -28,6 +30,7 @@
     "daisyui": "^5.0.43",
     "nodemon": "^3.1.10",
     "ts-node": "^10.9.2",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "vite": "^4.5.14"
   }
 }
