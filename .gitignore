@@ -4,3 +4,6 @@ dist
 TODO.txt
 pocketbase
 .vscode
+tsconfig.client.tsbuildinfo
+tsconfig.server.tsbuildinfo
+tsconfig.tsbuildinfo

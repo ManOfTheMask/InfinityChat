@@ -10,5 +10,7 @@ It will use openpgp.js mainly on the client side to handle encryption/decryption
 It will also have tailwindcss for styling and expressjs for a minimal webserver with express handlebars for html templating and all while using typescript
 
 ### How To Run
+Run "npm install"
 Use "npm run build" and then "npm run start" for production version.
 Use "npm run dev" to start application in dev mode.
+Use "npm run clean" to delete dist directory 
