@@ -2,6 +2,9 @@
 
 Infinity Chat is a client-based chat application where all encryption is performed in the browser. The platform stores only encrypted messages and public keys—your private keys remain secure and are never saved.
 
+# WARNING
+THIS PROJECT IS A WIP UNTIL v1.0 GETS RELEASED
+
 ### The Plan
 This is a selfhostable chat app meant for small to medium size groups who want to talk to each other with pgp with the convenience of the encryption being integrated into the chat.
 
@@ -13,4 +16,7 @@ It will also have tailwindcss for styling and expressjs for a minimal webserver 
 Run "npm install"
 Use "npm run build" and then "npm run start" for production version.
 Use "npm run dev" to start application in dev mode.
-Use "npm run clean" to delete dist directory 
+Use "npm run clean" to delete dist directory
+
+### Contributions
+Contributions to make things better are always welcome as long as they have the goal of the application in mind
