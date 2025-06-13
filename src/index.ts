@@ -28,9 +28,23 @@ app.get('/friends', (req: Request, res: Response) => {
     res.render('friends', { title: 'Friends List', script: 'friends' });
 });
 
+app.get('/login', (req: Request, res: Response) => {
+    res.render('login', { title: 'Login' });
+});
+
+app.get('/signup', (req: Request, res: Response) => {
+    res.render('signup', { title: 'Sign Up' });
+});
+
 app.get('/test', (req: Request, res: Response) => {
     res.render('test', { title: 'Test PGP', script: 'test' });
 });
+
+// Serve the 404 page for any unmatched routes
+app.use((req: Request, res: Response) => {
+    res.status(404).render('404', { title: '404 Not Found' });
+});
+
 
 // You can still add other API routes if needed, for example:
 app.get('/api/data', (req: Request, res: Response) => {
