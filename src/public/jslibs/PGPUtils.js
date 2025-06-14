@@ -58,3 +58,45 @@ export async function getgpgPublicKey(privateKeyFileInput, passphraseInput, publ
             publicKeyOutput.textContent = ''; // Clear the "Processing..." message
         }
 };
+
+export async function generatePGPKeyPair(nameInput,  passphraseInput, publicKeyOutput, privateKeyOutput, errorMessageDiv) {
+    console.log("generate PGP key pair script loaded ");
+    // Clear previous results and errors
+    publicKeyOutput.textContent = '';
+    privateKeyOutput.textContent = '';
+    errorMessageDiv.textContent = '';
+
+    const name = nameInput.value.trim();
+    const passphrase = passphraseInput.value.trim();
+
+    // --- Basic Validation ---
+    if (!name || !passphrase) {
+        errorMessageDiv.textContent = 'Please fill in all fields.';
+        return;
+    }
+
+    publicKeyOutput.textContent = 'Generating key pair...';
+    privateKeyOutput.textContent = '';
+
+    try {
+        // --- Generate the key pair ---
+        const { privateKey, publicKey } = await openpgp.generateKey({
+            type: 'rsa', // Type of the key
+            rsaBits: 2048, // Size of the key in bits
+            userIDs: [{ name }], // User ID for the key
+            passphrase // Passphrase to protect the private key
+        });
+
+        // --- Display the keys ---
+        publicKeyOutput.textContent = publicKey;
+        privateKeyOutput.textContent = privateKey;
+
+    } catch (error) {
+        console.error(error); // Log the full error to the console for debugging
+        
+        // Display a user-friendly error message
+        errorMessageDiv.textContent = `Error: ${error.message}`;
+        publicKeyOutput.textContent = ''; // Clear the "Generating key pair..." message
+        privateKeyOutput.textContent = '';
+    }
+}
