@@ -10,6 +10,7 @@ export default defineConfig({
         home: resolve(__dirname, 'src/public/ts/home.ts'),
         friends: resolve(__dirname, 'src/public/ts/friends.ts'),
         profile: resolve(__dirname, 'src/public/ts/profile.ts'),
+        generate: resolve(__dirname, 'src/public/ts/generate.ts'),
         test: resolve(__dirname, 'src/public/ts/test.ts'),
         PGPUtils: resolve(__dirname, 'src/public/jslibs/PGPUtils.js'),
       },
