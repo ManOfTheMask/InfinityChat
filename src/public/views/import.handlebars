@@ -1,0 +1,23 @@
+<!--generate loggin page with a form to upload private key plus a passphrase and a button to login-->
+<div class="flex flex-col items-center justify-center w-screen h-screen">
+    <div class="bg-base-200 shadow-lg p-8 rounded-lg text-center w-1/3 h-2/3">
+        <h1 class="text-base-content text-4xl mb-4">Sign up with Private Key</h1>
+        <p class="text-base-content text-lg mb-4">Please upload your private key and enter your passphrase to signup.</p>
+        
+        <div>
+            <label for="privateKeyFile">1. Select your private key file:</label><br>
+            <input type="file" id="privateKeyFile" accept=".asc,.gpg,.pgp" class="file-input" required>
+        </div>
+        
+        <div class="mt-4">
+            <label for="passphraseInput">2. Enter your passphrase:</label><br>
+            <input type="password" id="passphraseInput" placeholder="Enter passphrase" class="input" required>
+        </div>
+        
+        <div class="mt-6">
+            <button id="loginButton" class="btn btn-primary">Sign Up</button>
+        </div>
+        
+        <pre id="loginResultOutput"></pre>
+        <div id="errorMessage" class="text-red-500 mt-2"></div>
+    </div>

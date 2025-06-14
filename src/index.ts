@@ -40,6 +40,10 @@ app.get('/signup/generate', (req: Request, res: Response) => {
     res.render('generate', { title: 'Generate PGP Key', script: 'generate' });
 });
 
+app.get('/signup/import', (req: Request, res: Response) => {
+    res.render('import', { title: 'PGP Sign Up'});
+});
+
 app.get('/test', (req: Request, res: Response) => {
     res.render('test', { title: 'Test PGP', script: 'test' });
 });
