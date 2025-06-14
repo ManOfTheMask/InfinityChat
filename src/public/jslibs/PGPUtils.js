@@ -1,5 +1,5 @@
 import * as openpgp from 'openpgp';
-// these functions may change later because this implentation may become dumb and stupid real soon
+// Note: These functions may be subject to future changes as the implementation evolves.
 /**
  * Extracts the public key from a given private key file using OpenPGP.js.
  * @async
