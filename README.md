@@ -8,7 +8,7 @@ THIS PROJECT IS A WIP UNTIL v1.0 GETS RELEASED
 ### The Plan
 This is a selfhostable chat app meant for small to medium size groups who want to talk to each other with pgp with the convenience of the encryption being integrated into the chat.
 
-It will use pocketbase to have a portable small db to hold encrypted messages, public keys/users, and chatroom/dm data such as title of chat etc.
+It will use mongodb to have a database to hold encrypted messages, public keys/users, and chatroom/dm data such as title of chat etc.
 It will use openpgp.js mainly on the client side to handle encryption/decryption, private keys, and other sensitive stuff while the server side will only have functions need for connecting people through websockets, db handling, security challenges with public key etc.
 It will also have tailwindcss for styling and expressjs for a minimal webserver with express handlebars for html templating and all while using typescript
 
@@ -55,7 +55,7 @@ It will also have tailwindcss for styling and expressjs for a minimal webserver 
 - All sensitive data (messages, public keys) remain encrypted or are only public keys.
 - Chatroom type uses an enum for clarity (`dm` for direct message, `group` for group chat).
 - Timestamps help with auditing and ordering.
-- Idk how pocketbase will support this but it's whatever I'll figure it out
+- We are using mongodb now because pocketbase has unclear documentation and I am not spending a century learning that
 
 ### How To Run
 Run "npm install"
