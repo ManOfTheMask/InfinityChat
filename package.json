@@ -14,8 +14,10 @@
   "description": "",
   "dependencies": {
     "@tailwindcss/cli": "^4.1.8",
+    "dotenv": "^16.5.0",
     "express": "^5.1.0",
     "express-handlebars": "^8.0.3",
+    "mongoose": "^8.16.0",
     "openpgp": "^6.1.1",
     "tailwindcss": "^4.1.8"
   },
@@ -28,6 +30,6 @@
     "nodemon": "^3.1.10",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3",
-    "vite": "^4.5.14"
+    "vite": "^6.3.5"
   }
 }
