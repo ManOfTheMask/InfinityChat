@@ -7,3 +7,4 @@ pocketbase
 tsconfig.client.tsbuildinfo
 tsconfig.server.tsbuildinfo
 tsconfig.tsbuildinfo
+.env
