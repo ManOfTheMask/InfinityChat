@@ -11,37 +11,40 @@ const passphraseInput = document.getElementById('passphrase') as HTMLInputElemen
 
 let lastPrivateKey = '';
 
+// Hide download button initially
+if (downloadBtn) downloadBtn.style.display = 'none';
+
 generateKeyButton.addEventListener('click', async () => {
-  // You may want to prompt for a name and passphrase here, or use defaults for demo
-    const nameInput = { value: userNameInput.value };
-    const passphrase = { value: passphraseInput.value };
-    const publicKeyOutput = { textContent: '' };
-    const privateKeyOutput = { textContent: '' };
-
-await generatePGPKeyPair(
-    nameInput,
-    passphrase,
-    publicKeyOutput,
-    privateKeyOutput,
-    errorMessage
-);
-
-keyPairOutput.textContent = `Public Key:\n${publicKeyOutput.textContent}\n\nPrivate Key:\n${privateKeyOutput.textContent}`;
-lastPrivateKey = privateKeyOutput.textContent || '';
-
-if (lastPrivateKey) {
-    downloadBtn.style.display = '';
-}
+  keyPairOutput.textContent = '';
+  errorMessage.textContent = '';
+  const name = userNameInput?.value || 'User';
+  const passphrase = passphraseInput?.value || '';
+  if (!name || !passphrase) {
+    errorMessage.textContent = 'Please fill in all fields.';
+    return;
+  }
+  keyPairOutput.textContent = 'Generating key pair...';
+  try {
+    const { publicKey, privateKey } = await generatePGPKeyPair(name, passphrase);
+    keyPairOutput.textContent = `Public Key:\n${publicKey}\n\nPrivate Key:\n${privateKey}`;
+    lastPrivateKey = privateKey;
+    if (downloadBtn) downloadBtn.style.display = '';
+  } catch (error) {
+    const errMsg = error instanceof Error ? error.message : String(error);
+    errorMessage.textContent = `Error: ${errMsg}`;
+    keyPairOutput.textContent = '';
+    lastPrivateKey = '';
+    if (downloadBtn) downloadBtn.style.display = 'none';
+  }
 });
 
 downloadBtn.addEventListener('click', () => {
-if (!lastPrivateKey) return;
-  // Sanitize username for filename
-    const username = userNameInput.value.trim().replace(/[^a-zA-Z0-9_-]/g, '_') || 'user';
-    const blob = new Blob([lastPrivateKey], { type: 'application/pgp-keys' });
-    downloadLink.href = URL.createObjectURL(blob);
-    downloadLink.download = `${username}_privatekey.asc`;
-    downloadLink.style.display = '';
-    downloadLink.click();
-    downloadLink.style.display = 'none';
+  if (!lastPrivateKey) return;
+  const username = userNameInput?.value.trim().replace(/[^a-zA-Z0-9_-]/g, '_') || 'user';
+  const blob = new Blob([lastPrivateKey], { type: 'application/pgp-keys' });
+  downloadLink.href = URL.createObjectURL(blob);
+  downloadLink.download = `${username}_privatekey.asc`;
+  downloadLink.style.display = '';
+  downloadLink.click();
+  downloadLink.style.display = 'none';
 });
