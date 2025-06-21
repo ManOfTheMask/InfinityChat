@@ -13,6 +13,7 @@ export default defineConfig({
         generate: resolve(__dirname, 'src/public/ts/generate.ts'),
         test: resolve(__dirname, 'src/public/ts/test.ts'),
         PGPUtils: resolve(__dirname, 'src/public/jslibs/PGPUtils.js'),
+        import: resolve(__dirname, 'src/public/ts/import.ts'),
       },
       output: {
         entryFileNames: 'js/[name].js',

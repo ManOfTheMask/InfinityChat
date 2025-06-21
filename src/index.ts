@@ -3,8 +3,26 @@ import express, { Request, Response } from 'express';
 import path from 'path'; // Import the 'path' module
 import { engine } from 'express-handlebars'; // Import express-handlebars
 
+import 'dotenv/config'; // Load environment variables from .env file
+import mongoose from 'mongoose'; 
+import UserController from './Controllers/UserController';
+import dotenv from 'dotenv';
+
+dotenv.config(); // Load environment variables from .env file
+
 const app = express();
 const port = process.env.PORT || 3000;
+
+//init database connection here
+const dbUri = process.env.MONGO_URI
+if (!dbUri) {
+    console.error('MONGO_URI is not defined in the environment variables.');
+    process.exit(1); // Exit the process if MONGO_URI is not set
+}
+mongoose.connect(dbUri)
+.then(() => {
+    console.log('Connected to MongoDB');
+})
 
 // Set up Handlebars as the template engine
 app.engine('handlebars', engine());
@@ -14,6 +32,8 @@ app.set('views', path.join(__dirname, 'public' ,'views'));
 // Serve static files from the 'src/public' directory
 // The path.join() method is used to construct a platform-specific path.
 app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.urlencoded({ extended: true })); // Middleware to parse URL-encoded bodies
+app.use(express.json()); // Middleware to parse JSON bodies
 
 // Serve the index.html for / route
 app.get('/', (req: Request, res: Response) => {
@@ -41,7 +61,29 @@ app.get('/signup/generate', (req: Request, res: Response) => {
 });
 
 app.get('/signup/import', (req: Request, res: Response) => {
-    res.render('import', { title: 'PGP Sign Up'});
+    res.render('import', { title: 'PGP Sign Up', script: 'import' }); 
+    // Render the import page with a form to submit PGP key
+});
+
+// Handle POST request for importing PGP key
+app.post('/signup/import', (req: Request, res: Response) => {
+    console.log('body:', req.body); // Log the request body for debugging
+    // Access form data from req.body
+    const publicKey = req.body.publicKey; // Assuming public key is sent in the body
+    const username = req.body.username; // Assuming username is sent in the body
+    if (!publicKey || !username) {
+        res.status(400).json({ success: false, message: 'Public key and username are required.' });    
+    }
+    // Call UserController to create a new user with the provided public key and username
+    UserController.createUser(publicKey, username)
+        .then(() => {
+            console.log('User created successfully with public key:', publicKey);
+            res.redirect('/profile'); // Redirect to profile after import
+        })
+        .catch((error) => {
+            console.error('Error creating user:', error);
+            res.status(500).json({ success: false, message: 'Failed to create user.' });
+        });
 });
 
 app.get('/test', (req: Request, res: Response) => {

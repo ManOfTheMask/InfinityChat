@@ -15,14 +15,12 @@ It will also have tailwindcss for styling and expressjs for a minimal webserver 
 ### Planned Database Schema
 
 #### User
-- `id`: int (primary key)
 - `username`: string (unique)
 - `public_key`: string (unique, stored server-side, served to clients for encryption)
 - `created_at`: datetime
 - `updated_at`: datetime
 
 #### Chatroom
-- `id`: int (primary key)
 - `name`: string (unique)
 - `creator_id`: int (foreign key to User)
 - `type`: enum (`dm`, `group`)
@@ -30,22 +28,19 @@ It will also have tailwindcss for styling and expressjs for a minimal webserver 
 - `updated_at`: datetime
 
 #### Membership
-- `id`: int (primary key)
 - `user_id`: int (foreign key to User)
 - `chatroom_id`: int (foreign key to Chatroom)
 - `joined_at`: datetime
 
 #### Message
-- `id`: int (primary key)
 - `chatroom_id`: int (foreign key to Chatroom)
 - `sender_id`: int (foreign key to User)
 - `content`: string (encrypted)
 - `created_at`: datetime
 
 #### Friendship
-- `id`: int (primary key)
 - `user_id`: int (foreign key to User)
-- `friend_id`: int (foreign key to User)
+- `friend_id`: int (foreign key to Other User)
 - `created_at`: datetime
 
 **Notes:**
