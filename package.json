@@ -4,6 +4,7 @@
   "main": "index.js",
   "scripts": {
     "clean": "rm -rf dist",
+    "test": "npm run build; vitest",
     "build": "npm run clean && tsc --build && vite build && npx tailwindcss -i ./src/public/css/input.css -o ./dist/public/css/output.css --minify && cpx 'src/public/**' dist/public",
     "start": "node dist/index.js",
     "dev": "npm run clean && tsc --build && concurrently \"vite build --watch\" \"cpx './src/public/**' ./dist/public --watch\" \"npx tailwindcss -i ./src/public/css/input.css -o ./dist/public/css/output.css --watch\" \"nodemon ./dist/index.js\""
@@ -25,12 +26,14 @@
   "devDependencies": {
     "@types/express": "^5.0.2",
     "@types/node": "^22.15.29",
+    "@vitest/ui": "^3.2.4",
     "concurrently": "^9.1.2",
     "cpx2": "^8.0.0",
     "daisyui": "^5.0.43",
     "nodemon": "^3.1.10",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3",
-    "vite": "^6.3.5"
+    "vite": "^6.3.5",
+    "vitest": "^3.2.4"
   }
 }
