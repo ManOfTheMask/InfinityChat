@@ -8,26 +8,49 @@ THIS PROJECT IS A WIP UNTIL v1.0 GETS RELEASED
 ### The Plan
 This is a selfhostable chat app meant for small to medium size groups who want to talk to each other with pgp with the convenience of the encryption being integrated into the chat.
 
-It will use pocketbase to have a portable small db to hold encrypted messages, public keys/users, and chatroom/dm data such as title of chat etc.
+It will use mongodb to have a database to hold encrypted messages, public keys/users, and chatroom/dm data such as title of chat etc.
 It will use openpgp.js mainly on the client side to handle encryption/decryption, private keys, and other sensitive stuff while the server side will only have functions need for connecting people through websockets, db handling, security challenges with public key etc.
 It will also have tailwindcss for styling and expressjs for a minimal webserver with express handlebars for html templating and all while using typescript
 
-Planned db schema:
-Chatroom:
-    chatroom_name: string (unique)
-    creator: string 
-    messages: list of dicts (each dict contains content, username, date)
-    list of members: list of public keys
-    dm: boolean (true if direct message, false if group chat)
+### Planned Database Schema
 
-User:
-    public_key: string
-    dms: list of chatroom names (for direct messages)
-    groups: list of group names (for group chats)
-    friends: list of usernames
-    created_at: datetime
-    updated_at: datetime
+#### User
+- `username`: string (unique)
+- `public_key`: string (unique, stored server-side, served to clients for encryption)
+- `created_at`: datetime
+- `updated_at`: datetime
 
+#### Chatroom
+- `name`: string (unique)
+- `creator_id`: int (foreign key to User)
+- `type`: enum (`dm`, `group`)
+- `created_at`: datetime
+- `updated_at`: datetime
+
+#### Membership
+- `user_id`: int (foreign key to User)
+- `chatroom_id`: int (foreign key to Chatroom)
+- `joined_at`: datetime
+
+#### Message
+- `chatroom_id`: int (foreign key to Chatroom)
+- `sender_id`: int (foreign key to User)
+- `content`: string (encrypted)
+- `created_at`: datetime
+
+#### Friendship
+- `user_id`: int (foreign key to User)
+- `friend_id`: int (foreign key to Other User)
+- `created_at`: datetime
+
+**Notes:**
+- The `public_key` field in the User table is stored server-side and served to clients, allowing users to encrypt messages for others and decrypt messages client-side.
+- Membership table efficiently manages users in chatrooms (many-to-many).
+- Friendship table manages user connections.
+- All sensitive data (messages, public keys) remain encrypted or are only public keys.
+- Chatroom type uses an enum for clarity (`dm` for direct message, `group` for group chat).
+- Timestamps help with auditing and ordering.
+- We are using mongodb now because pocketbase has unclear documentation and I am not spending a century learning that
 
 ### How To Run
 Run "npm install"
