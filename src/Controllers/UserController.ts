@@ -3,16 +3,18 @@ import UserModel from "../Models/UserModel";
 class UserController {
     //TODO: make sure that createUser is only called once per public key to prevent duplicates
     async createUser(publicKey: string, username: string) {
+        //check if user already exists
+        const existingUser = await UserModel.findOne({ publicKey });
+        if (existingUser) {
+            throw new Error("User with this public key already exists");
+        }
+        if (!publicKey || !username) {
+            throw new Error("Public key and username are required");
+        }
         const user = new UserModel({ publicKey, username });
         return await user.save();
     }
 
-    async getUserByPublicKey(publicKey: string) {
-        if (!publicKey) {
-            throw new Error("Public key is required");
-        }
-        return await UserModel.findOne({ publicKey });
-    }
 
     async getUserByUsername(username: string) {
         if (!username) {
@@ -29,6 +31,16 @@ class UserController {
             { username: newUsername, updatedAt: Date.now() },
             { new: true }
         );
+    }
+
+    async getUserByPublicKey(publicKey: string) {
+        try {
+            const user = await UserModel.findOne({ publicKey: publicKey });
+            return user;
+        } catch (error) {
+            console.error('Error finding user by public key:', error);
+            throw error;
+        }
     }
 }
 
