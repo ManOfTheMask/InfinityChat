@@ -66,7 +66,7 @@ export async function generatePGPKeyPair(name, passphrase) {
  * @param {string} message - The message to sign.
  * @param {File} privateKeyFile - The private key file.
  * @param {string} passphrase - The passphrase for the private key.
- * @returns {Promise<string>} - The signed message.
+ * @returns {Promise<openpgp.CleartextMessage>} - The signed message.
  * @throws {Error} - Throws an error if signing fails.
  */
 export async function signMessage(message, privateKeyFile, passphrase) {
@@ -76,22 +76,66 @@ export async function signMessage(message, privateKeyFile, passphrase) {
     try {
         const privateKeyArmored = await privateKeyFile.text();
         const privateKey = await openpgp.readPrivateKey({
-            armoredKey: privateKeyArmored
+            armoredKey: privateKeyArmored,
         });
         const decryptedPrivateKey = await openpgp.decryptKey({
             privateKey,
             passphrase
         });
-        
-        const signedMessage = await openpgp.sign({
-            message: await openpgp.createMessage({ text: message }),
+        const messageObject = await openpgp.createCleartextMessage({ text: message });
+
+        const cleartextMessage = await openpgp.sign({
+            message: messageObject,
             signingKeys: decryptedPrivateKey,
-            detached: true
         });
         
+
+        const signedMessage = await openpgp.readCleartextMessage({
+            cleartextMessage
+        });
+        console.log('Signed message:', signedMessage.text);
         return signedMessage;
+
     } catch (error) {
         throw new Error(`Failed to sign message: ${error.message}`);
+    }
+}
+/**
+ * Verifies a signed message using OpenPGP.js.
+ * @async
+ * @param {openpgp.CleartextMessage} signedMessage - The signed message to verify.
+ * @param {File} publicKeyFile - The public key file used for verification.
+ * @returns {Promise<boolean>} - Returns true if the signature is valid, false otherwise.
+ * @throws {Error} - Throws an error if verification fails.
+ */
+export async function verifyMessage(signedMessage, publicKeyFile) {
+    if (!signedMessage || !publicKeyFile) {
+        throw new Error('Signed message and public key are required.');
+    }
+    try {
+        const publicKeyArmored = await publicKeyFile.text();
+
+        const publicKey = await openpgp.readKey({
+            armoredKey: publicKeyArmored
+        });
+
+        const verified = await openpgp.verify({
+            message: signedMessage,
+            verificationKeys: publicKey
+        });
+        // Check if the signature is valid
+        const { valid, keyID } = verified.signatures[0];
+        console.log('Signature valid:', keyID);
+        
+        if (keyID) {
+            //return the message    
+            return true; // Return the verified message text
+            }
+        else {
+            return false;
+        }
+    } catch (error) {
+        throw new Error(`Failed to verify signature: ${error.message}`);
     }
 }
 
@@ -111,5 +155,60 @@ export async function extractUserIdFromPublicKey(publicKeyArmored) {
         return userId;
     } catch (error) {
         throw new Error(`Failed to extract user ID: ${error.message}`);
+    }
+}
+/**
+ * Encrypts a message using a public key.
+ * @async
+ * @param {string} message - The message to encrypt.
+ * @param {File} publicKeyFile - The public key file used for encryption.
+ * @returns {Promise<string>} - The encrypted message.
+ * @throws {Error} - Throws an error if encryption fails.
+ */
+export async function encryptMessage(message, publicKeyFile) {
+    if (!message || !publicKeyFile) {
+        throw new Error('Message and public key file are required.');
+    }
+    try {
+        const publicKeyArmored = await publicKeyFile.text();
+        const publicKey = await openpgp.readKey({
+            armoredKey: publicKeyArmored
+        });
+        const encryptedMessage = await openpgp.encrypt({
+            message: await openpgp.createMessage({ text: message }),
+            encryptionKeys: publicKey
+        });
+        return encryptedMessage;
+    } catch (error) {
+        throw new Error(`Failed to encrypt message: ${error.message}`);
+    }
+}
+/**
+ * @param {string} encryptedMessage 
+ * @param {File} privateKeyFile 
+ * @param {string} passphrase 
+ * @returns {Promise<string>} - The decrypted message.
+ * @throws {Error} - Throws an error if decryption fails.
+ */
+export async function decryptMessage(encryptedMessage, privateKeyFile, passphrase) {
+    if (!encryptedMessage || !privateKeyFile || !passphrase) {
+        throw new Error('Encrypted message, private key file, and passphrase are required.');
+    }
+    try {
+        const privateKeyArmored = await privateKeyFile.text();
+        const privateKey = await openpgp.readPrivateKey({
+            armoredKey: privateKeyArmored
+        });
+        const decryptedPrivateKey = await openpgp.decryptKey({
+            privateKey,
+            passphrase
+        });
+        const decryptedMessage = await openpgp.decrypt({
+            message: await openpgp.readMessage({ armoredMessage: encryptedMessage }),
+            decryptionKeys: decryptedPrivateKey
+        });
+        return decryptedMessage.data;
+    } catch (error) {
+        throw new Error(`Failed to decrypt message: ${error.message}`);
     }
 }

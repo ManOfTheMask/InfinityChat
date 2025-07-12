@@ -1,0 +1,1 @@
+console.log("this is the login page script for the public directory.");

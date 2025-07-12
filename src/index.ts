@@ -7,6 +7,7 @@ import 'dotenv/config'; // Load environment variables from .env file
 import mongoose from 'mongoose'; 
 import UserController from './Controllers/UserController';
 import dotenv from 'dotenv';
+import session from 'express-session';
 
 dotenv.config(); // Load environment variables from .env file
 
@@ -34,6 +35,16 @@ app.set('views', path.join(__dirname, 'public' ,'views'));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.urlencoded({ extended: true })); // Middleware to parse URL-encoded bodies
 app.use(express.json()); // Middleware to parse JSON bodies
+app.use(session({
+    secret: '', //add your secret here, it should be a long random string and in environment variables
+    resave: false,
+    saveUninitialized: true,
+    cookie: {
+        secure: false, // Set to true in production (requires HTTPS)
+        httpOnly: true,
+        maxAge: 1000 * 60 * 60 // 1 hour
+    }
+}));
 
 // Serve the index.html for / route
 app.get('/', (req: Request, res: Response) => {
@@ -49,7 +60,7 @@ app.get('/friends', (req: Request, res: Response) => {
 });
 
 app.get('/login', (req: Request, res: Response) => {
-    res.render('login', { title: 'Login' });
+    res.render('login', { title: 'Login', script: 'login' });
 });
 
 app.get('/signup', (req: Request, res: Response) => {
@@ -85,6 +96,7 @@ app.post('/signup/import', (req: Request, res: Response) => {
             res.status(500).json({ success: false, message: 'Failed to create user.' });
         });
 });
+
 
 app.get('/test', (req: Request, res: Response) => {
     res.render('test', { title: 'Test PGP', script: 'test' });
