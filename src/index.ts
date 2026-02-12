@@ -10,6 +10,7 @@ import dotenv from 'dotenv';
 import session from 'express-session';
 import openpgp from 'openpgp'; // Import OpenPGP for cryptographic operations
 import { a } from 'vitest/dist/chunks/suite.d.FvehnV49';
+import crypto from 'crypto';
 
 // Extend SessionData to include custom properties
 declare module 'express-session' {
@@ -115,6 +116,26 @@ app.get('/signup/generate', (req: Request, res: Response) => {
     res.render('generate', { title: 'Generate PGP Key', script: 'generate' });
 });
 
+app.post('/signup/generate', (req: Request, res: Response) => {
+    const { publicKey, username } = req.body;
+    if (!publicKey || !username) {
+        res.status(400).json({ success: false, message: 'Public key and username are required.' });
+        return;
+    }
+    // Normalize the public key by removing all whitespace
+    const normalizedPublicKey = publicKey.replace(/\s/g, '');
+
+    UserController.createUser(normalizedPublicKey, username)
+        .then(() => {
+            console.log('User created successfully with public key:', normalizedPublicKey);
+            res.json({ success: true }); // Respond with JSON on success
+        })
+        .catch((error) => {
+            console.error('Error creating user:', error);
+            res.status(500).json({ success: false, message: 'Failed to create user.' });
+        });
+});
+
 app.get('/signup/import', (req: Request, res: Response) => {
     res.render('import', { title: 'PGP Sign Up', script: 'import' }); 
     // Render the import page with a form to submit PGP key
@@ -148,48 +169,48 @@ app.get('/login', async (req: Request, res: Response) => {
 
 app.get('/login/challenge', async (req: Request, res: Response) => {
     const { publicKey } = req.query; // Use query parameters for GET requests
-    if (!publicKey) {
+    if (!publicKey || typeof publicKey !== 'string') {
         res.status(400).json({ success: false, message: 'Public key is required.' });
         return;
     }
     try {
-        const user = await UserController.getUserByPublicKey(publicKey as string);
+        // Normalize the public key for database lookup
+        const normalizedPublicKey = publicKey.replace(/\s/g, '');
+        const user = await UserController.getUserByPublicKey(normalizedPublicKey);
         if (!user) {
             res.status(404).json({ success: false, message: 'User not found.' });
             return;
         }
-        
-        // Clean up expired challenges
-        cleanupExpiredChallenges();
-        
+
         // Generate a random challenge
-        const challenge = `auth-token-${Date.now()}-${Math.random()}`;
-        const challengeId = `challenge-${Date.now()}-${Math.random()}`;
-        
-        // Store challenge data
+        const challenge = crypto.randomBytes(32).toString('hex');
+        const challengeId = crypto.randomBytes(16).toString('hex');
+
+        // Encrypt the challenge with the user's public key
+        // Use the original, non-normalized publicKey from the request for encryption
+        const pgpPublicKey = await openpgp.readKey({ armoredKey: publicKey });
+        const message = await openpgp.createMessage({ text: challenge });
+        const encryptedChallenge = await openpgp.encrypt({
+            message,
+            encryptionKeys: pgpPublicKey,
+        });
+
+        // Store the challenge data
         pendingChallenges.set(challengeId, {
             challenge,
-            publicKey: user.publicKey,
+            publicKey: user.publicKey, // This is the normalized key, which is fine for storage here
             userId: user._id.toString(),
-            timestamp: Date.now()
+            timestamp: Date.now(),
         });
-        
+
         // Auto-cleanup after 5 minutes
         setTimeout(() => {
             pendingChallenges.delete(challengeId);
         }, 5 * 60 * 1000);
         
-        // Encrypt challenge with user's public key
-        const message = await openpgp.createMessage({ text: challenge });
-        const userPublicKey = await openpgp.readKey({ armoredKey: user.publicKey });
-        const encrypted = await openpgp.encrypt({
-            message: message,
-            encryptionKeys: userPublicKey,
-        });
-        
         res.json({ 
             success: true, 
-            encryptedChallenge: encrypted,
+            encryptedChallenge: encryptedChallenge,
             challengeId: challengeId // Send this back to client
         });
     } catch (error) {

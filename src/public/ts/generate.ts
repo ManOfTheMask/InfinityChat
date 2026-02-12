@@ -10,6 +10,7 @@ const userNameInput = document.getElementById('username') as HTMLInputElement;
 const passphraseInput = document.getElementById('passphrase') as HTMLInputElement;
 
 let lastPrivateKey = '';
+let lastPublicKey = ''; // Add this line
 
 // Hide download button initially
 if (downloadBtn) downloadBtn.style.display = 'none';
@@ -28,12 +29,14 @@ generateKeyButton.addEventListener('click', async () => {
     const { publicKey, privateKey } = await generatePGPKeyPair(name, passphrase);
     keyPairOutput.textContent = `Public Key:\n${publicKey}\n\nPrivate Key:\n${privateKey}`;
     lastPrivateKey = privateKey;
+    lastPublicKey = publicKey; // Add this line
     if (downloadBtn) downloadBtn.style.display = '';
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
     errorMessage.textContent = `Error: ${errMsg}`;
     keyPairOutput.textContent = '';
     lastPrivateKey = '';
+    lastPublicKey = ''; // Add this line
     if (downloadBtn) downloadBtn.style.display = 'none';
   }
 });
@@ -47,4 +50,27 @@ downloadBtn.addEventListener('click', () => {
   downloadLink.style.display = '';
   downloadLink.click();
   downloadLink.style.display = 'none';
+// Create user after downloading private key
+if (lastPublicKey) {
+    const username = userNameInput.value.trim();
+    
+    fetch('/signup/generate', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ publicKey: lastPublicKey, username }),
+    })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success === false) {
+                errorMessage.textContent = data.message || 'Failed to create user.';
+            } else {
+                window.location.href = '/profile';
+            }
+        })
+        .catch(error => {
+            errorMessage.textContent = `Error creating user: ${error.message}`;
+        });
+}
 });
