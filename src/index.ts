@@ -1,5 +1,5 @@
 // src/index.ts
-import express, { Request, Response } from 'express';
+import express, { Request, Response, Router } from 'express';
 import path from 'path'; // Import the 'path' module
 import { engine } from 'express-handlebars'; // Import express-handlebars
 
@@ -7,6 +7,41 @@ import 'dotenv/config'; // Load environment variables from .env file
 import mongoose from 'mongoose'; 
 import UserController from './Controllers/UserController';
 import dotenv from 'dotenv';
+import session from 'express-session';
+import openpgp from 'openpgp'; // Import OpenPGP for cryptographic operations
+import { a } from 'vitest/dist/chunks/suite.d.FvehnV49';
+import crypto from 'crypto';
+
+// Extend SessionData to include custom properties
+declare module 'express-session' {
+    interface SessionData {
+        authenticated?: boolean;
+        userId?: string;
+    }
+}
+
+// Define the structure of the challenge data
+interface ChallengeData {
+    challenge: string;
+    publicKey: string;
+    userId: string;
+    timestamp: number;
+}
+
+// In-memory storage for challenges (expires after 5 minutes)
+const pendingChallenges = new Map<string, ChallengeData>();
+
+// Helper function to clean up expired challenges
+function cleanupExpiredChallenges() {
+    const now = Date.now();
+    const expireTime = 5 * 60 * 1000; // 5 minutes
+    
+    for (const [key, data] of pendingChallenges.entries()) {
+        if (now - data.timestamp > expireTime) {
+            pendingChallenges.delete(key);
+        }
+    }
+}
 
 dotenv.config(); // Load environment variables from .env file
 
@@ -14,7 +49,7 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 //init database connection here
-const dbUri = process.env.MONGO_URI
+const dbUri = process.env.MONGO_URI || 'mongodb://localhost:27017/infinitychat'; // Use a default URI if not set in environment variables
 if (!dbUri) {
     console.error('MONGO_URI is not defined in the environment variables.');
     process.exit(1); // Exit the process if MONGO_URI is not set
@@ -23,6 +58,8 @@ mongoose.connect(dbUri)
 .then(() => {
     console.log('Connected to MongoDB');
 })
+
+const session_secret = process.env.SESSION_SECRET || 'default-secret'; // Use a default secret if not set in environment variables
 
 // Set up Handlebars as the template engine
 app.engine('handlebars', engine());
@@ -34,6 +71,25 @@ app.set('views', path.join(__dirname, 'public' ,'views'));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.urlencoded({ extended: true })); // Middleware to parse URL-encoded bodies
 app.use(express.json()); // Middleware to parse JSON bodies
+app.use(session({
+    secret: session_secret, //add your secret here, it should be a long random string and in environment variables
+    resave: false,
+    saveUninitialized: true,
+    cookie: {
+        secure: false, // Set to true in production (requires HTTPS)
+        httpOnly: true,
+        maxAge: 1000 * 60 * 60 // 1 hour
+    }
+}));
+
+// Middleware to protect routes
+function requireAuth(req: Request, res: Response, next: any) {
+    if (req.session.authenticated) {
+        next();
+    } else {
+        res.redirect('/login');
+    }
+}
 
 // Serve the index.html for / route
 app.get('/', (req: Request, res: Response) => {
@@ -49,7 +105,7 @@ app.get('/friends', (req: Request, res: Response) => {
 });
 
 app.get('/login', (req: Request, res: Response) => {
-    res.render('login', { title: 'Login' });
+    res.render('login', { title: 'Login', script: 'login' });
 });
 
 app.get('/signup', (req: Request, res: Response) => {
@@ -58,6 +114,26 @@ app.get('/signup', (req: Request, res: Response) => {
 
 app.get('/signup/generate', (req: Request, res: Response) => {
     res.render('generate', { title: 'Generate PGP Key', script: 'generate' });
+});
+
+app.post('/signup/generate', (req: Request, res: Response) => {
+    const { publicKey, username } = req.body;
+    if (!publicKey || !username) {
+        res.status(400).json({ success: false, message: 'Public key and username are required.' });
+        return;
+    }
+    // Normalize the public key by removing all whitespace
+    const normalizedPublicKey = publicKey.replace(/\s/g, '');
+
+    UserController.createUser(normalizedPublicKey, username)
+        .then(() => {
+            console.log('User created successfully with public key:', normalizedPublicKey);
+            res.json({ success: true }); // Respond with JSON on success
+        })
+        .catch((error) => {
+            console.error('Error creating user:', error);
+            res.status(500).json({ success: false, message: 'Failed to create user.' });
+        });
 });
 
 app.get('/signup/import', (req: Request, res: Response) => {
@@ -86,7 +162,100 @@ app.post('/signup/import', (req: Request, res: Response) => {
         });
 });
 
-app.get('/test', (req: Request, res: Response) => {
+app.get('/login', async (req: Request, res: Response) => {
+    // Render the login page with a form to submit PGP key
+    res.render('login', { title: 'Login', script: 'login' });
+});
+
+app.get('/login/challenge', async (req: Request, res: Response) => {
+    const { publicKey } = req.query; // Use query parameters for GET requests
+    if (!publicKey || typeof publicKey !== 'string') {
+        res.status(400).json({ success: false, message: 'Public key is required.' });
+        return;
+    }
+    try {
+        // Normalize the public key for database lookup
+        const normalizedPublicKey = publicKey.replace(/\s/g, '');
+        const user = await UserController.getUserByPublicKey(normalizedPublicKey);
+        if (!user) {
+            res.status(404).json({ success: false, message: 'User not found.' });
+            return;
+        }
+
+        // Generate a random challenge
+        const challenge = crypto.randomBytes(32).toString('hex');
+        const challengeId = crypto.randomBytes(16).toString('hex');
+
+        // Encrypt the challenge with the user's public key
+        // Use the original, non-normalized publicKey from the request for encryption
+        const pgpPublicKey = await openpgp.readKey({ armoredKey: publicKey });
+        const message = await openpgp.createMessage({ text: challenge });
+        const encryptedChallenge = await openpgp.encrypt({
+            message,
+            encryptionKeys: pgpPublicKey,
+        });
+
+        // Store the challenge data
+        pendingChallenges.set(challengeId, {
+            challenge,
+            publicKey: user.publicKey, // This is the normalized key, which is fine for storage here
+            userId: user._id.toString(),
+            timestamp: Date.now(),
+        });
+
+        // Auto-cleanup after 5 minutes
+        setTimeout(() => {
+            pendingChallenges.delete(challengeId);
+        }, 5 * 60 * 1000);
+        
+        res.json({ 
+            success: true, 
+            encryptedChallenge: encryptedChallenge,
+            challengeId: challengeId // Send this back to client
+        });
+    } catch (error) {
+        console.error('Error creating challenge:', error);
+        res.status(500).json({ success: false, message: 'Internal server error.' });
+    }
+});
+
+app.post('/login/verify', async (req: Request, res: Response) => {
+    const { decryptedChallenge, challengeId } = req.body;
+    
+    if (!decryptedChallenge || !challengeId) {
+        res.status(400).json({ success: false, message: 'Invalid challenge response.' });
+        return;
+    }
+    
+    try {
+        // Get challenge data
+        const challengeData = pendingChallenges.get(challengeId);
+        if (!challengeData) {
+            res.status(401).json({ success: false, message: 'Challenge not found or expired.' });
+            return;
+        }
+        
+        // Verify the decrypted challenge matches the stored challenge
+        if (decryptedChallenge === challengeData.challenge) {
+            // Set authenticated session
+            req.session.authenticated = true;
+            req.session.userId = challengeData.userId;
+            
+            // Remove the used challenge
+            pendingChallenges.delete(challengeId);
+            
+            res.json({ success: true, message: 'Authentication successful.' });
+        } else {
+            res.status(401).json({ success: false, message: 'Challenge verification failed.' });
+        }
+    } catch (error) {
+        console.error('Error verifying challenge:', error);
+        res.status(500).json({ success: false, message: 'Internal server error.' });
+    }
+});
+
+//create protected route by using middleware
+app.use('/protected', requireAuth, (req: Request, res: Response) => {
     res.render('test', { title: 'Test PGP', script: 'test' });
 });
 

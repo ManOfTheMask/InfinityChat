@@ -15,10 +15,12 @@
   "description": "",
   "dependencies": {
     "@tailwindcss/cli": "^4.1.8",
+    "@types/express-session": "^1.18.2",
     "@types/mongoose": "^5.11.96",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
     "express-handlebars": "^8.0.3",
+    "express-session": "^1.18.1",
     "mongoose": "^8.16.0",
     "openpgp": "^6.1.1",
     "tailwindcss": "^4.1.8"
