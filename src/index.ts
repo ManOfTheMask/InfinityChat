@@ -96,8 +96,24 @@ app.get('/', (req: Request, res: Response) => {
     res.render('home', { title: 'Home', script: 'home' });
 });
 
-app.get('/profile', (req: Request, res: Response) => {
-    res.render('profile', { title: 'Profile', script: 'profile' });
+app.get('/profile', requireAuth, async (req: Request, res: Response) => {
+    try {
+        const user = await UserController.getUserById(req.session.userId!);
+        if (!user) {
+            res.status(404).render('404', { title: '404 Not Found' });
+            return;
+        }
+        res.render('profile', {
+            title: 'Profile',
+            script: 'profile',
+            username: user.username,
+            publicKey: user.publicKey,
+            createdAt: user.createdAt.toLocaleDateString(),
+        });
+    } catch (error) {
+        console.error('Error fetching profile:', error);
+        res.status(500).send('Internal server error.');
+    }
 });
 
 app.get('/friends', (req: Request, res: Response) => {
