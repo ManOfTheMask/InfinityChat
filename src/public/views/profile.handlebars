@@ -1,13 +1,64 @@
 <div class="flex flex-col items-center justify-center w-screen h-screen">
-    <div class="bg-base-200 shadow-lg p-8 rounded-lg text-center w-1/3 h-2/3">
+    <div class="bg-base-200 shadow-lg p-8 rounded-lg text-center w-1/3 h-2/3 overflow-y-auto">
        <div class="flex flex-col items-center text-base-content text-4xl mb-4">
-            <p>Insert profile pic default here</p>
-            <p>username: JohnDoe</p>
-            <p class="text-base-content text-lg mt-2">This is your profile page.</p>
-            <p class="text-base-content text-lg">it will be used to display your profile information. like creation date and public key</p>
+            <img src="/img/profileplaceholder.jpg" alt="Profile Picture" class="w-24 h-24 rounded-full mb-4">
+            <h2 class="text-base-content text-4xl mt-2">Username: {{username}}</h2>
+            <h2 class="text-base-content text-lg mt-2">Member since: {{createdAt}}</h2>
+            <div class="w-full mt-2 rounded-md overflow-hidden border border-base-300">
+                <div class="relative flex items-center bg-neutral px-3 py-1">
+                    <span class="absolute left-1/2 -translate-x-1/2 text-neutral-content text-xs font-mono">PGP PUBLIC KEY</span>
+                    <button onclick="copyPublicKey()" class="btn btn-xs btn-ghost text-neutral-content font-mono ml-auto" id="copy-btn">copy</button>
+                </div>
+                <pre class="bg-base-300 text-base-content text-xs font-mono p-3 text-left whitespace-pre-wrap break-all" id="public-key-text">{{publicKey}}</pre>
+            </div>
        </div>
     </div>
 </div>
 <!-- The compiled JavaScript will be served from /js/page2.js -->
 <script type="module" src="../js/profile.js"></script>
+<script>
+function formatPGPKey(raw) {
+    // If it already has proper armor headers (not stripped), return as-is
+    if (raw.includes('-----BEGIN PGP PUBLIC KEY BLOCK-----')) return raw;
+
+    // Reconstruct from stripped (whitespace-removed) key
+    const beginStripped = '-----BEGINPGPPUBLICKEYBLOCK-----';
+    const endStripped   = '-----ENDPGPPUBLICKEYBLOCK-----';
+
+    const bodyStart = raw.indexOf(beginStripped);
+    const bodyEnd   = raw.indexOf(endStripped);
+    if (bodyStart === -1 || bodyEnd === -1) return raw; // unrecognised format
+
+    let body = raw.substring(bodyStart + beginStripped.length, bodyEnd);
+
+    // Last 5 chars of body are the CRC checksum: '=' + 4 base64 chars
+    const checksum  = body.slice(-5);
+    const base64Data = body.slice(0, -5);
+
+    // Re-wrap base64 data at 64 chars per line (RFC 4880)
+    const lines = [];
+    for (let i = 0; i < base64Data.length; i += 64) {
+        lines.push(base64Data.substring(i, i + 64));
+    }
+
+    return '-----BEGIN PGP PUBLIC KEY BLOCK-----\n\n' +
+           lines.join('\n') +
+           '\n' + checksum +
+           '\n-----END PGP PUBLIC KEY BLOCK-----';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const pre = document.getElementById('public-key-text');
+    pre.textContent = formatPGPKey(pre.textContent.trim());
+});
+
+function copyPublicKey() {
+    const key = document.getElementById('public-key-text').textContent;
+    navigator.clipboard.writeText(key).then(() => {
+        const btn = document.getElementById('copy-btn');
+        btn.textContent = 'copied!';
+        setTimeout(() => btn.textContent = 'copy', 2000);
+    });
+}
+</script>
 

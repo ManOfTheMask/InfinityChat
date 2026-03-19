@@ -42,6 +42,15 @@ class UserController {
             throw error;
         }
     }
+
+    async getUserById(id: string) {
+        try {
+            return await UserModel.findById(id);
+        } catch (error) {
+            console.error('Error finding user by id:', error);
+            throw error;
+        }
+    }
 }
 
 export default new UserController();
