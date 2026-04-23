@@ -106,7 +106,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (verifyResponse.ok && verifyData.success) {
                 resultOutput.textContent += '\n✓ Authentication successful!';
                 resultOutput.textContent += '\nRedirecting to profile...';
-                
+
+                // Store private key and passphrase in sessionStorage for E2E encryption
+                const privateKeyArmoredText = await privateKeyFile.text();
+                sessionStorage.setItem('pgpPrivateKey', privateKeyArmoredText);
+                sessionStorage.setItem('pgpPassphrase', passphrase);
+                // Also store own public key so we can encrypt-to-self (sender can read sent msgs)
+                sessionStorage.setItem('pgpPublicKey', publicKey);
+
                 setTimeout(() => {
                     window.location.href = '/profile';
                 }, 2000);

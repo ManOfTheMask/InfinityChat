@@ -15,6 +15,7 @@ export default defineConfig({
         PGPUtils: resolve(__dirname, 'src/public/jslibs/PGPUtils.js'),
         import: resolve(__dirname, 'src/public/ts/import.ts'),
         login: resolve(__dirname, 'src/public/ts/login.ts'),
+        chat: resolve(__dirname, 'src/public/ts/chat.ts'),
       },
       output: {
         entryFileNames: 'js/[name].js',

@@ -2,26 +2,50 @@
 
     <button id="addFriendBtn" class="btn btn-primary mb-4 absolute top-8 right-8 z-20">Add Friend</button>
 
-    <!-- Modal Overlay -->
-    <div id="addFriendModal" class="fixed inset-0 bg-transparent flex items-center justify-center z-50 hidden">
-        <div class="bg-base-100 p-8 rounded-lg shadow-lg w-96 opacity-100 blur-none">
+    <!-- Add Friend Modal -->
+    <div id="addFriendModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 hidden">
+        <div class="bg-base-100 p-8 rounded-lg shadow-lg w-96">
             <h2 class="text-2xl mb-4">Add a Friend</h2>
-            <input id="publicKeyInput" type="text" placeholder="Enter public key..." class="input input-bordered w-full mb-4" />
-            <div class="flex justify-end">
-                <button id="closeModalBtn" class="btn btn-secondary mr-2">Cancel</button>
-                <button class="btn btn-primary">Add</button>
+            <p id="modalMessage" class="text-sm mb-3 hidden"></p>
+            <textarea id="publicKeyInput" placeholder="Paste their PGP public key here..." class="textarea textarea-bordered w-full mb-4 h-32 font-mono text-xs"></textarea>
+            <div class="flex justify-end gap-2">
+                <button id="closeModalBtn" class="btn btn-secondary">Cancel</button>
+                <button id="sendRequestBtn" class="btn btn-primary">Send Request</button>
             </div>
         </div>
     </div>
 
     <div id="mainContent" class="bg-base-200 shadow-lg p-8 rounded-lg text-center w-9/10 h-4/5 overflow-y-auto transition-all duration-300">
-        <h1 class="text-base-content text-4xl mb-4">Friends List</h1>
-        <p class="text-base-content text-lg mb-4">Here you can see your friends and their public keys.</p>
-        <ul class="list-disc list-inside text-center scroll-auto">
+        <h1 class="text-base-content text-4xl mb-6">Friends</h1>
+
+        {{#if incomingRequests.length}}
+        <div class="mb-8">
+            <h2 class="text-2xl mb-4 text-left">Pending Requests</h2>
+            <ul class="flex flex-col gap-2">
+                {{#each incomingRequests}}
+                <li class="flex items-center justify-between bg-base-100 rounded-lg px-4 py-3" data-request-id="{{this.requestId}}">
+                    <span class="font-medium">{{this.username}}</span>
+                    <div class="flex gap-2">
+                        <button class="btn btn-success btn-sm acceptBtn">Accept</button>
+                        <button class="btn btn-error btn-sm declineBtn">Decline</button>
+                    </div>
+                </li>
+                {{/each}}
+            </ul>
+        </div>
+        {{/if}}
+
+        <h2 class="text-2xl mb-4 text-left">Friends List</h2>
+        <ul id="friendsList" class="flex flex-col gap-2">
             {{#each friends}}
-                <li class="text-base-content list-none">{{this.username}} - Public Key: {{this.publicKey}}</li>
+                <li class="flex items-center justify-between bg-base-100 rounded-lg px-4 py-3" data-friend-id="{{this.id}}">
+                    <div class="flex flex-col items-start">
+                        <span class="font-semibold text-base">{{this.username}}</span>
+                    </div>
+                    <button class="btn btn-primary btn-sm messageBtn">Message</button>
+                </li>
             {{else}}
-                <li class="text-base-content list-none">No friends added yet.</li>
+                <li class="text-base-content/60 list-none py-4">No friends added yet.</li>
             {{/each}}
         </ul>
     </div>

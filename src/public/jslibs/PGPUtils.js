@@ -158,13 +158,60 @@ export async function extractUserIdFromPublicKey(publicKeyArmored) {
     }
 }
 /**
- * Encrypts a message using a public key.
+ * Encrypts a message using an armored public key string.
  * @async
  * @param {string} message - The message to encrypt.
- * @param {File} publicKeyFile - The public key file used for encryption.
- * @returns {Promise<string>} - The encrypted message.
+ * @param {string} publicKeyArmored - The armored public key string.
+ * @returns {Promise<string>} - The encrypted message (armored).
  * @throws {Error} - Throws an error if encryption fails.
  */
+export async function encryptMessageWithKey(message, publicKeyArmored) {
+    if (!message || !publicKeyArmored) {
+        throw new Error('Message and public key are required.');
+    }
+    try {
+        const publicKey = await openpgp.readKey({ armoredKey: publicKeyArmored });
+        const encryptedMessage = await openpgp.encrypt({
+            message: await openpgp.createMessage({ text: message }),
+            encryptionKeys: publicKey,
+        });
+        return encryptedMessage;
+    } catch (error) {
+        throw new Error(`Failed to encrypt message: ${error.message}`);
+    }
+}
+
+/**
+ * Decrypts an armored PGP message using an armored private key string.
+ * Returns null if the message is not a valid PGP message (e.g. plaintext legacy message).
+ * @async
+ * @param {string} encryptedMessage - The armored encrypted message.
+ * @param {string} privateKeyArmored - The armored private key string.
+ * @param {string} passphrase - The passphrase for the private key.
+ * @returns {Promise<string|null>} - The decrypted plaintext, or null if not decryptable.
+ * @throws {Error} - Throws an error if decryption fails for a reason other than non-PGP content.
+ */
+export async function decryptMessageWithKey(encryptedMessage, privateKeyArmored, passphrase) {
+    if (!encryptedMessage || !privateKeyArmored || !passphrase) {
+        throw new Error('Encrypted message, private key, and passphrase are required.');
+    }
+    // Bail out early if this is clearly not a PGP message
+    if (!encryptedMessage.includes('-----BEGIN PGP MESSAGE-----')) {
+        return null;
+    }
+    try {
+        const privateKey = await openpgp.readPrivateKey({ armoredKey: privateKeyArmored });
+        const decryptedPrivateKey = await openpgp.decryptKey({ privateKey, passphrase });
+        const message = await openpgp.readMessage({ armoredMessage: encryptedMessage });
+        const { data } = await openpgp.decrypt({
+            message,
+            decryptionKeys: decryptedPrivateKey,
+        });
+        return data;
+    } catch (error) {
+        throw new Error(`Failed to decrypt message: ${error.message}`);
+    }
+}
 export async function encryptMessage(message, publicKeyFile) {
     if (!message || !publicKeyFile) {
         throw new Error('Message and public key file are required.');
@@ -211,4 +258,47 @@ export async function decryptMessage(encryptedMessage, privateKeyFile, passphras
     } catch (error) {
         throw new Error(`Failed to decrypt message: ${error.message}`);
     }
+}
+
+/**
+ * Encrypts a chat message to both the recipient and the sender,
+ * so both parties can decrypt the message with their own private key.
+ * @async
+ * @param {string} message - The plaintext message.
+ * @param {string} recipientPublicKeyArmored - The recipient's armored PGP public key.
+ * @param {string} senderPublicKeyArmored - The sender's armored PGP public key.
+ * @returns {Promise<string>} - The armored encrypted message.
+ */
+export async function encryptChatMessage(message, recipientPublicKeyArmored, senderPublicKeyArmored) {
+    if (!message || !recipientPublicKeyArmored || !senderPublicKeyArmored) {
+        throw new Error('Message, recipient key, and sender key are required.');
+    }
+    const recipientKey = await openpgp.readKey({ armoredKey: recipientPublicKeyArmored });
+    const senderKey = await openpgp.readKey({ armoredKey: senderPublicKeyArmored });
+    return await openpgp.encrypt({
+        message: await openpgp.createMessage({ text: message }),
+        encryptionKeys: [recipientKey, senderKey],
+    });
+}
+
+/**
+ * Decrypts a chat message using an armored private key string and passphrase.
+ * @async
+ * @param {string} armoredMessage - The armored encrypted message.
+ * @param {string} privateKeyArmored - The armored private key string.
+ * @param {string} passphrase - The passphrase for the private key.
+ * @returns {Promise<string>} - The decrypted plaintext.
+ */
+export async function decryptChatMessage(armoredMessage, privateKeyArmored, passphrase) {
+    if (!armoredMessage || !privateKeyArmored || !passphrase) {
+        throw new Error('Encrypted message, private key, and passphrase are required.');
+    }
+    const privateKey = await openpgp.readPrivateKey({ armoredKey: privateKeyArmored });
+    const decryptedKey = await openpgp.decryptKey({ privateKey, passphrase });
+    const message = await openpgp.readMessage({ armoredMessage });
+    const { data } = await openpgp.decrypt({
+        message,
+        decryptionKeys: decryptedKey,
+    });
+    return data;
 }
