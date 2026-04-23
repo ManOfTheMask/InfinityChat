@@ -1,65 +1,116 @@
-# Infinity Chat
+# InfinityChat
 
-Infinity Chat is a client-based chat application where all encryption is performed in the browser. The platform stores only encrypted messages and public keys—your private keys remain secure and are never saved.
+> **⚠ Work in progress — not yet at v1.0**
 
-# WARNING
-THIS PROJECT IS A WIP UNTIL v1.0 GETS RELEASED
+InfinityChat is a self-hostable, end-to-end encrypted messaging application for small to medium groups. All encryption and decryption happens entirely in the browser using [OpenPGP.js](https://openpgpjs.org/). The server never sees plaintext messages or private keys — it only stores ciphertext and public keys.
 
-### The Plan
-This is a selfhostable chat app meant for small to medium size groups who want to talk to each other with pgp with the convenience of the encryption being integrated into the chat.
+---
 
-It will use mongodb to have a database to hold encrypted messages, public keys/users, and chatroom/dm data such as title of chat etc.
-It will use openpgp.js mainly on the client side to handle encryption/decryption, private keys, and other sensitive stuff while the server side will only have functions need for connecting people through websockets, db handling, security challenges with public key etc.
-It will also have tailwindcss for styling and expressjs for a minimal webserver with express handlebars for html templating and all while using typescript
+## How It Works
 
-### Planned Database Schema
+### Authentication
+InfinityChat uses a **PGP challenge-response** authentication flow instead of passwords:
 
-#### User
-- `username`: string (unique)
-- `public_key`: string (unique, stored server-side, served to clients for encryption)
-- `created_at`: datetime
-- `updated_at`: datetime
+1. On signup, the browser generates a PGP key pair. The private key is downloaded to your device and never leaves it. The public key is registered with the server.
+2. On login, you upload your private key file and enter your passphrase. The client extracts the public key, requests an encrypted challenge from the server, decrypts it locally, and returns the solution to prove ownership of the private key.
+3. Once authenticated, a session is established server-side.
 
-#### Chatroom
-- `name`: string (unique)
-- `creator_id`: int (foreign key to User)
-- `type`: enum (`dm`, `group`)
-- `created_at`: datetime
-- `updated_at`: datetime
+### Messaging
+- Conversations are 1-to-1 DMs between friends.
+- Messages are encrypted in the browser before being sent and decrypted in the browser after being received.
+- Real-time delivery is handled via **WebSockets**.
+- The server stores only the encrypted ciphertext and relays messages to connected clients.
 
-#### Membership
-- `user_id`: int (foreign key to User)
-- `chatroom_id`: int (foreign key to Chatroom)
-- `joined_at`: datetime
+### Friends
+- Users can send, accept, and decline friend requests by username.
+- The friends list shows each friend's public key, which is used for encrypting messages to them.
 
-#### Message
-- `chatroom_id`: int (foreign key to Chatroom)
-- `sender_id`: int (foreign key to User)
-- `content`: string (encrypted)
-- `created_at`: datetime
+---
 
-#### Friendship
-- `user_id`: int (foreign key to User)
-- `friend_id`: int (foreign key to Other User)
-- `created_at`: datetime
+## Tech Stack
 
-**Notes:**
-- The `public_key` field in the User table is stored server-side and served to clients, allowing users to encrypt messages for others and decrypt messages client-side.
-- Membership table efficiently manages users in chatrooms (many-to-many).
-- Friendship table manages user connections.
-- All sensitive data (messages, public keys) remain encrypted or are only public keys.
-- Chatroom type uses an enum for clarity (`dm` for direct message, `group` for group chat).
-- Timestamps help with auditing and ordering.
-- We are using mongodb now because pocketbase has unclear documentation and I am not spending a century learning that
+| Layer | Technology |
+|---|---|
+| Server | Node.js, Express 5, TypeScript |
+| Templating | Express Handlebars |
+| Database | MongoDB (Mongoose) |
+| Real-time | WebSockets (`ws`) |
+| Encryption | OpenPGP.js (client-side) |
+| Styling | Tailwind CSS, DaisyUI |
+| Bundler | Vite |
+| Testing | Vitest |
 
-### How To Run
-Add .env file in the main project directory with the following lines
-MONGO_URI="mongodb://localhost:27017/infinitychat"
-SESSION_SECRET="your-session-secret"
-Run "npm install"
-Use "npm run build" and then "npm run start" for production version.
-Use "npm run dev" to start application in dev mode.
-Use "npm run clean" to delete dist directory
+---
 
-### Contributions
-Contributions to make things better are always welcome as long as they have the goal of the application in mind
+## Database Schema
+
+### User
+| Field | Type | Notes |
+|---|---|---|
+| `username` | string | unique |
+| `publicKey` | string | fingerprint; unique |
+| `publicKeyArmored` | string | full ASCII-armored public key |
+| `createdAt` | datetime | |
+| `updatedAt` | datetime | |
+
+### Conversation
+| Field | Type | Notes |
+|---|---|---|
+| `participants` | ObjectId[] | references User |
+| `lastMessageAt` | datetime | used for sorting |
+| `pinnedBy` | ObjectId[] | users who pinned this conversation |
+
+### Message
+| Field | Type | Notes |
+|---|---|---|
+| `conversationId` | ObjectId | references Conversation |
+| `senderId` | ObjectId | references User |
+| `content` | string | PGP-encrypted ciphertext |
+| `createdAt` | datetime | |
+
+### FriendRequest
+| Field | Type | Notes |
+|---|---|---|
+| `fromUserId` | ObjectId | references User |
+| `toUserId` | ObjectId | references User |
+| `status` | enum | `pending`, `accepted`, `declined` |
+| `createdAt` | datetime | |
+
+---
+
+## How To Run
+
+### Prerequisites
+- Node.js 18+
+- A running MongoDB instance
+
+### Setup
+
+1. **Clone the repository and install dependencies:**
+   ```bash
+   git clone https://github.com/ManOfTheMask/InfinityChat.git
+   cd InfinityChat
+   npm install
+   ```
+
+2. **Create a `.env` file** in the project root:
+   ```env
+   MONGO_URI="mongodb://localhost:27017/infinitychat"
+   SESSION_SECRET="your-session-secret"
+   ```
+
+3. **Run the application:**
+
+   | Command | Description |
+   |---|---|
+   | `npm run dev` | Start in development mode with file watching |
+   | `npm run build` | Compile and bundle for production |
+   | `npm run start` | Start the production build |
+   | `npm run test` | Build and run the test suite |
+   | `npm run clean` | Delete the `dist/` directory |
+
+---
+
+## Contributing
+
+Contributions are welcome as long as they align with the goal of the project: private, self-hosted, end-to-end encrypted messaging that is simple to use.
