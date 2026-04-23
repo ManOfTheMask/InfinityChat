@@ -53,6 +53,9 @@ It will also have tailwindcss for styling and expressjs for a minimal webserver 
 - We are using mongodb now because pocketbase has unclear documentation and I am not spending a century learning that
 
 ### How To Run
+Add .env file in the main project directory with the following lines
+MONGO_URI="mongodb://localhost:27017/infinitychat"
+SESSION_SECRET="your-session-secret"
 Run "npm install"
 Use "npm run build" and then "npm run start" for production version.
 Use "npm run dev" to start application in dev mode.
