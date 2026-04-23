@@ -23,11 +23,13 @@
     "express-session": "^1.18.1",
     "mongoose": "^8.16.0",
     "openpgp": "^6.1.1",
-    "tailwindcss": "^4.1.8"
+    "tailwindcss": "^4.1.8",
+    "ws": "^8.20.0"
   },
   "devDependencies": {
     "@types/express": "^5.0.2",
     "@types/node": "^22.15.29",
+    "@types/ws": "^8.18.1",
     "@vitest/ui": "^3.2.4",
     "concurrently": "^9.1.2",
     "cpx2": "^8.0.0",

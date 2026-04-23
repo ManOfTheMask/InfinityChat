@@ -18,11 +18,14 @@
                     <li>
                         <details>
                             <summary>Menu</summary>
-                            <ul class="bg-base-100 rounded-t-none p-2">
+                            <ul class="bg-base-100 rounded-t-none p-2 z-[100]">
                                 <li><a href="/">Home</a></li>
                                 <li><a href="/profile">Profile</a></li>
                                 <li><a href="/friends">Friends List</a></li>
                                 <li><a href="/chat">Chat</a></li>
+                                <li>
+                                    <button type="button" onclick="sessionStorage.clear();fetch('/logout',{method:'POST'}).then(()=>window.location.href='/')" class="w-full text-left text-error">Logout</button>
+                                </li>
                             </ul>
                         </details>
                     </li>
