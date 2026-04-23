@@ -1,5 +1,6 @@
 // src/index.ts
 import express, { Request, Response, Router } from 'express';
+import http from 'http';
 import path from 'path'; // Import the 'path' module
 import { engine } from 'express-handlebars'; // Import express-handlebars
 
@@ -8,11 +9,13 @@ import mongoose from 'mongoose';
 import UserController from './Controllers/UserController';
 import FriendController from './Controllers/FriendController';
 import ChatController from './Controllers/ChatController';
+import ConversationModel from './Models/ConversationModel';
 import dotenv from 'dotenv';
 import session from 'express-session';
 import openpgp from 'openpgp'; // Import OpenPGP for cryptographic operations
 import { a } from 'vitest/dist/chunks/suite.d.FvehnV49';
 import crypto from 'crypto';
+import { WebSocketServer, WebSocket } from 'ws';
 
 // Extend SessionData to include custom properties
 declare module 'express-session' {
@@ -62,6 +65,55 @@ mongoose.connect(dbUri)
 })
 
 const session_secret = process.env.SESSION_SECRET || 'default-secret'; // Use a default secret if not set in environment variables
+const sessionStore = new session.MemoryStore();
+
+// ── WebSocket helpers ──────────────────────────────────────────────────────────
+const connectedUsers = new Map<string, Set<WebSocket>>();
+
+function addUserSocket(userId: string, ws: WebSocket) {
+    if (!connectedUsers.has(userId)) connectedUsers.set(userId, new Set());
+    connectedUsers.get(userId)!.add(ws);
+}
+
+function removeUserSocket(userId: string, ws: WebSocket) {
+    connectedUsers.get(userId)?.delete(ws);
+    if (connectedUsers.get(userId)?.size === 0) connectedUsers.delete(userId);
+}
+
+function broadcastToUser(userId: string, data: object) {
+    const sockets = connectedUsers.get(userId);
+    if (!sockets) return;
+    const msg = JSON.stringify(data);
+    for (const ws of sockets) {
+        if (ws.readyState === WebSocket.OPEN) ws.send(msg);
+    }
+}
+
+function parseCookies(header: string): Record<string, string> {
+    const cookies: Record<string, string> = {};
+    for (const pair of header.split(';')) {
+        const [k, ...v] = pair.trim().split('=');
+        if (k) cookies[k.trim()] = decodeURIComponent(v.join('='));
+    }
+    return cookies;
+}
+
+function unsignSessionCookie(signed: string, secret: string): string | false {
+    if (!signed.startsWith('s:')) return false;
+    const str = signed.slice(2);
+    const dotIdx = str.lastIndexOf('.');
+    if (dotIdx < 1) return false;
+    const value = str.slice(0, dotIdx);
+    const sig = str.slice(dotIdx + 1);
+    const mac = crypto.createHmac('sha256', secret)
+        .update(value)
+        .digest('base64')
+        .replace(/=+$/, '');
+    const a = Buffer.from(sig);
+    const b = Buffer.from(mac);
+    if (a.length !== b.length) return false;
+    return crypto.timingSafeEqual(a, b) ? value : false;
+}
 
 // Set up Handlebars as the template engine
 app.engine('handlebars', engine());
@@ -75,6 +127,7 @@ app.use(express.urlencoded({ extended: true })); // Middleware to parse URL-enco
 app.use(express.json()); // Middleware to parse JSON bodies
 app.use(session({
     secret: session_secret, //add your secret here, it should be a long random string and in environment variables
+    store: sessionStore,
     resave: false,
     saveUninitialized: true,
     cookie: {
@@ -260,6 +313,28 @@ app.post('/chat/:conversationId/messages', requireAuth, async (req: Request, res
             req.session.userId!,
             content
         );
+
+        // Broadcast new message to all participants via WebSocket
+        const conv = await ConversationModel.findById(req.params.conversationId);
+        const sender = await UserController.getUserById(req.session.userId!);
+        if (conv && sender) {
+            const wsMsg = {
+                type: 'new_message',
+                conversationId: req.params.conversationId,
+                message: {
+                    id: message._id.toString(),
+                    senderUsername: sender.username,
+                    senderId: req.session.userId!,
+                    content,
+                    deleted: false,
+                    createdAt: new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                },
+            };
+            for (const participantId of conv.participants as any[]) {
+                broadcastToUser(participantId.toString(), wsMsg);
+            }
+        }
+
         res.json({ success: true, messageId: message._id.toString() });
     } catch (error: any) {
         res.status(400).json({ success: false, message: error.message });
@@ -270,6 +345,20 @@ app.post('/chat/:conversationId/messages', requireAuth, async (req: Request, res
 app.delete('/chat/:conversationId/messages/:messageId', requireAuth, async (req: Request, res: Response) => {
     try {
         await ChatController.deleteMessage(req.params.messageId, req.session.userId!);
+
+        // Broadcast deletion to all participants via WebSocket
+        const conv = await ConversationModel.findById(req.params.conversationId);
+        if (conv) {
+            const wsMsg = {
+                type: 'message_deleted',
+                conversationId: req.params.conversationId,
+                messageId: req.params.messageId,
+            };
+            for (const participantId of conv.participants as any[]) {
+                broadcastToUser(participantId.toString(), wsMsg);
+            }
+        }
+
         res.json({ success: true });
     } catch (error: any) {
         res.status(400).json({ success: false, message: error.message });
@@ -293,7 +382,6 @@ app.post('/chat/:conversationId/pin', requireAuth, async (req: Request, res: Res
 app.get('/chat/:conversationId/recipient-key', requireAuth, async (req: Request, res: Response) => {
     try {
         const userId = req.session.userId!;
-        const ConversationModel = (await import('./Models/ConversationModel')).default;
         const conv = await ConversationModel.findById(req.params.conversationId)
             .populate('participants', 'publicKeyArmored username');
         if (!conv) {
@@ -315,6 +403,13 @@ app.get('/chat/:conversationId/recipient-key', requireAuth, async (req: Request,
     } catch (error: any) {
         res.status(500).json({ success: false, message: error.message });
     }
+});
+
+app.post('/logout', (req: Request, res: Response) => {
+    req.session.destroy((err) => {
+        if (err) console.error('Error destroying session:', err);
+        res.redirect('/');
+    });
 });
 
 app.get('/login', (req: Request, res: Response) => {
@@ -486,7 +581,32 @@ app.get('/api/data', (req: Request, res: Response) => {
 });
 
 
-app.listen(port, () => {
-  console.log(`Server is running on http://localhost:${port}`);
-  console.log(`Serving static files from: ${path.join(__dirname, 'public')}`);
+// ── HTTP + WebSocket server ───────────────────────────────────────────────────
+const server = http.createServer(app);
+
+const wss = new WebSocketServer({ server, path: '/ws' });
+
+wss.on('connection', (ws, req) => {
+    const cookies = parseCookies(req.headers.cookie || '');
+    const rawSid = cookies['connect.sid'];
+    if (!rawSid) { ws.close(1008, 'Unauthorized'); return; }
+
+    const sessionId = unsignSessionCookie(rawSid, session_secret);
+    if (!sessionId) { ws.close(1008, 'Unauthorized'); return; }
+
+    sessionStore.get(sessionId, (err, sess) => {
+        if (err || !sess?.authenticated || !sess?.userId) {
+            ws.close(1008, 'Unauthorized');
+            return;
+        }
+        const userId = sess.userId;
+        addUserSocket(userId, ws);
+        ws.on('close', () => removeUserSocket(userId, ws));
+        ws.on('error', () => removeUserSocket(userId, ws));
+    });
+});
+
+server.listen(port, () => {
+    console.log(`Server is running on http://localhost:${port}`);
+    console.log(`Serving static files from: ${path.join(__dirname, 'public')}`);
 });

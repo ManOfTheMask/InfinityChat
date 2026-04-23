@@ -7,12 +7,48 @@ let activeReceiverPublicKey: string | null = null;
 const currentUserId: string | null =
     document.querySelector<HTMLMetaElement>('meta[name="current-user-id"]')?.content ?? null;
 
+// Track rendered message IDs to deduplicate WebSocket pushes
+const renderedMessageIds = new Set<string>();
+
 // PGP credentials — loaded from sessionStorage (populated on login or via unlock overlay)
 // Read as functions so they always reflect the latest value after an in-page unlock
 function pgpPrivateKey(): string | null { return sessionStorage.getItem('pgpPrivateKey'); }
 function pgpPassphrase(): string | null { return sessionStorage.getItem('pgpPassphrase'); }
 function pgpPublicKey(): string | null  { return sessionStorage.getItem('pgpPublicKey'); }
 function hasCredentials(): boolean { return !!pgpPrivateKey() && !!pgpPassphrase(); }
+
+// ── WebSocket ─────────────────────────────────────────────────────────────────
+const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+const chatWs = new WebSocket(`${wsProtocol}//${window.location.host}/ws`);
+
+chatWs.onmessage = async (event: MessageEvent) => {
+    let data: any;
+    try { data = JSON.parse(event.data); } catch { return; }
+
+    if (data.type === 'new_message') {
+        if (renderedMessageIds.has(data.message.id)) return; // deduplicate
+        renderedMessageIds.add(data.message.id);
+        if (data.conversationId === activeConversationId) {
+            const el = await buildMessageEl(data.message);
+            messagesContainer.appendChild(el);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+    }
+
+    if (data.type === 'message_deleted') {
+        if (data.conversationId === activeConversationId) {
+            const el = messagesContainer.querySelector<HTMLElement>(`[data-message-id="${data.messageId}"]`);
+            if (el) {
+                const bubble = el.querySelector('div')!;
+                bubble.className = 'relative max-w-sm px-4 py-2 rounded-2xl text-sm shadow bg-base-200 text-base-content/40 italic';
+                bubble.innerHTML = '<span class="block text-xs font-semibold mb-1 opacity-70">Deleted</span><span>This message was deleted.</span>';
+            }
+        }
+    }
+};
+
+chatWs.onerror = () => console.warn('[WS] Connection error');
+chatWs.onclose = () => console.warn('[WS] Connection closed');
 
 // ── Element refs ──────────────────────────────────────────────────────────────
 const conversationList   = document.getElementById('conversationList')    as HTMLUListElement;
@@ -67,6 +103,7 @@ async function openConversation(id: string, item: HTMLElement) {
         // Non-fatal: send will show an error if key is still null
     }
 
+    renderedMessageIds.clear();
     loadMessages(id);
 }
 
@@ -92,6 +129,7 @@ async function renderMessages(messages: any[]) {
     }
     messagesContainer.innerHTML = '';
     for (const msg of messages) {
+        renderedMessageIds.add(msg.id); // track so WS pushes don't duplicate
         const el = await buildMessageEl(msg);
         messagesContainer.appendChild(el);
     }
@@ -182,8 +220,7 @@ async function doSend() {
         });
         const data = await res.json();
         if (!data.success) throw new Error(data.message);
-        // Reload to pick up new message with correct metadata
-        loadMessages(activeConversationId!);
+        // WebSocket push will deliver the message to both participants in real time
     } catch (err: any) {
         messageInput.value = content; // restore on failure
         alert(err.message);
