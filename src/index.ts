@@ -1,5 +1,5 @@
 // src/index.ts
-import express, { Request, Response, Router } from 'express';
+import express, { Request, Response } from 'express';
 import http from 'http';
 import path from 'path'; // Import the 'path' module
 import { engine } from 'express-handlebars'; // Import express-handlebars
@@ -13,7 +13,6 @@ import ConversationModel from './Models/ConversationModel';
 import dotenv from 'dotenv';
 import session from 'express-session';
 import openpgp from 'openpgp'; // Import OpenPGP for cryptographic operations
-import { a } from 'vitest/dist/chunks/suite.d.FvehnV49';
 import crypto from 'crypto';
 import { WebSocketServer, WebSocket } from 'ws';
 
