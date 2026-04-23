@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {{#if currentUserId}}<meta name="current-user-id" content="{{currentUserId}}">{{/if}}
     <link rel="stylesheet" href="/css/output.css">
     <title>{{title}}</title>
 </head>
@@ -21,6 +22,7 @@
                                 <li><a href="/">Home</a></li>
                                 <li><a href="/profile">Profile</a></li>
                                 <li><a href="/friends">Friends List</a></li>
+                                <li><a href="/chat">Chat</a></li>
                             </ul>
                         </details>
                     </li>

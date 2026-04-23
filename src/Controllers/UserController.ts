@@ -2,7 +2,7 @@ import UserModel from "../Models/UserModel";
 
 class UserController {
     //TODO: make sure that createUser is only called once per public key to prevent duplicates
-    async createUser(publicKey: string, username: string) {
+    async createUser(publicKey: string, username: string, publicKeyArmored?: string) {
         //check if user already exists
         const existingUser = await UserModel.findOne({ publicKey });
         if (existingUser) {
@@ -11,7 +11,7 @@ class UserController {
         if (!publicKey || !username) {
             throw new Error("Public key and username are required");
         }
-        const user = new UserModel({ publicKey, username });
+        const user = new UserModel({ publicKey, username, publicKeyArmored: publicKeyArmored ?? null });
         return await user.save();
     }
 

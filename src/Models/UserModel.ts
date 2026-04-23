@@ -7,6 +7,13 @@ const userSchema = new mongoose.Schema({
         unique: true,
     },
 
+    // Original armored PGP public key (with line breaks) used for encryption.
+    // publicKey above is the whitespace-stripped version used for deduplication lookups.
+    publicKeyArmored: {
+        type: String,
+        default: null,
+    },
+
     username: {
         type: String,
         required: true,
@@ -21,6 +28,12 @@ const userSchema = new mongoose.Schema({
     updatedAt: {
         type: Date,
         default: Date.now,
+    },
+
+    friends: {
+        type: [mongoose.Schema.Types.ObjectId],
+        ref: "User",
+        default: [],
     },
 });
 

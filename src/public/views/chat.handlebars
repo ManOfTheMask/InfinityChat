@@ -1,0 +1,101 @@
+<div class="flex h-[calc(100vh-4rem)] overflow-hidden">
+
+    <!-- Unlock overlay: shown when PGP credentials aren't in sessionStorage -->
+    <div id="unlockOverlay" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50 hidden">
+        <div class="bg-base-100 rounded-xl shadow-2xl p-8 w-full max-w-md flex flex-col gap-4">
+            <div class="flex items-center gap-3">
+                <span class="text-2xl">🔒</span>
+                <h2 class="text-xl font-bold">Unlock End-to-End Encryption</h2>
+            </div>
+            <p class="text-sm text-base-content/60">
+                Your private key is needed to decrypt messages. It stays in your browser only and is never sent to the server.
+            </p>
+            <div class="form-control gap-1">
+                <label class="label"><span class="label-text">Private Key File</span></label>
+                <input id="unlockKeyFile" type="file" accept=".asc,.gpg,.key,text/plain" class="file-input file-input-bordered w-full" />
+            </div>
+            <div class="form-control gap-1">
+                <label class="label"><span class="label-text">Passphrase</span></label>
+                <input id="unlockPassphrase" type="password" placeholder="Your PGP passphrase" class="input input-bordered w-full" />
+            </div>
+            <p id="unlockError" class="text-error text-sm hidden"></p>
+            <button id="unlockBtn" class="btn btn-primary w-full">Unlock</button>
+        </div>
+    </div>
+
+    <!-- Sidebar: conversation list -->
+    <aside id="sidebar" class="w-72 flex-shrink-0 bg-base-100 border-r border-base-300 flex flex-col">
+        <div class="p-4 border-b border-base-300 flex items-center justify-between">
+            <h2 class="text-lg font-bold">Chats</h2>
+            <button id="newChatBtn" class="btn btn-primary btn-sm">+ New Chat</button>
+        </div>
+
+        <!-- New chat friend picker (hidden by default) -->
+        <div id="friendPicker" class="hidden p-3 border-b border-base-300 bg-base-200">
+            <p class="text-xs text-base-content/60 mb-2">Select a friend to message</p>
+            <ul id="friendPickerList" class="flex flex-col gap-1 max-h-48 overflow-y-auto">
+                <li class="text-xs text-base-content/40 italic">Loading...</li>
+            </ul>
+        </div>
+
+        <!-- Conversation list -->
+        <ul id="conversationList" class="flex-1 overflow-y-auto">
+            {{#if conversations.length}}
+                {{#each conversations}}
+                <li class="conversation-item flex items-center gap-2 px-4 py-3 cursor-pointer hover:bg-base-200 border-b border-base-300/50 group"
+                    data-id="{{this.id}}"
+                    data-pinned="{{this.pinned}}">
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-1">
+                            {{#if this.pinned}}
+                            <span class="text-warning text-xs" title="Pinned">📌</span>
+                            {{/if}}
+                            <span class="font-medium truncate">{{this.otherUsername}}</span>
+                        </div>
+                        {{#if this.lastMessageAt}}
+                        <p class="text-xs text-base-content/40 truncate">{{this.lastMessageAt}}</p>
+                        {{/if}}
+                    </div>
+                    <button class="pin-btn btn btn-ghost btn-xs opacity-0 group-hover:opacity-100 shrink-0" title="{{#if this.pinned}}Unpin{{else}}Pin{{/if}}">
+                        {{#if this.pinned}}Unpin{{else}}Pin{{/if}}
+                    </button>
+                </li>
+                {{/each}}
+            {{else}}
+                <li id="noChats" class="text-center text-base-content/40 text-sm p-8">
+                    No chats yet. Start one with a friend!
+                </li>
+            {{/if}}
+        </ul>
+    </aside>
+
+    <!-- Main chat area -->
+    <div class="flex-1 flex flex-col min-w-0">
+
+        <!-- Chat header -->
+        <div id="chatHeader" class="h-14 bg-base-100 border-b border-base-300 flex items-center px-6 gap-3 shrink-0">
+            <span id="chatHeaderName" class="font-semibold text-lg text-base-content/40 italic">Select a chat</span>
+        </div>
+
+        <!-- Messages -->
+        <div id="messagesContainer" class="flex-1 overflow-y-auto p-6 flex flex-col gap-3 bg-base-300">
+            <div id="messagesPlaceholder" class="m-auto text-base-content/30 text-sm select-none">
+                Open a conversation to start chatting
+            </div>
+        </div>
+
+        <!-- Input bar -->
+        <div id="inputBar" class="bg-base-100 border-t border-base-300 p-4 flex gap-3 items-end shrink-0">
+            <textarea
+                id="messageInput"
+                rows="1"
+                placeholder="Type a message..."
+                disabled
+                class="textarea textarea-bordered flex-1 resize-none max-h-36 overflow-y-auto disabled:opacity-40"
+            ></textarea>
+            <button id="sendBtn" disabled class="btn btn-primary self-end disabled:opacity-40">Send</button>
+        </div>
+    </div>
+</div>
+
+<script type="module" src="/js/chat.js"></script>

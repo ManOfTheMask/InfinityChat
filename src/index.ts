@@ -6,6 +6,8 @@ import { engine } from 'express-handlebars'; // Import express-handlebars
 import 'dotenv/config'; // Load environment variables from .env file
 import mongoose from 'mongoose'; 
 import UserController from './Controllers/UserController';
+import FriendController from './Controllers/FriendController';
+import ChatController from './Controllers/ChatController';
 import dotenv from 'dotenv';
 import session from 'express-session';
 import openpgp from 'openpgp'; // Import OpenPGP for cryptographic operations
@@ -116,8 +118,203 @@ app.get('/profile', requireAuth, async (req: Request, res: Response) => {
     }
 });
 
-app.get('/friends', (req: Request, res: Response) => {
-    res.render('friends', { title: 'Friends List', script: 'friends' });
+app.get('/friends', requireAuth, async (req: Request, res: Response) => {
+    try {
+        const userId = req.session.userId!;
+        const [friends, incomingRequests] = await Promise.all([
+            FriendController.getFriends(userId),
+            FriendController.getPendingIncomingRequests(userId),
+        ]);
+        res.render('friends', {
+            title: 'Friends List',
+            script: 'friends',
+            friends: (friends as any[]).map(f => ({
+                id: f._id.toString(),
+                username: f.username,
+                publicKey: f.publicKey,
+            })),
+            incomingRequests: incomingRequests.map((r: any) => ({
+                requestId: r._id.toString(),
+                username: (r.fromUserId as any).username,
+                publicKey: (r.fromUserId as any).publicKey,
+            })),
+        });
+    } catch (error) {
+        console.error('Error loading friends page:', error);
+        res.status(500).send('Internal server error.');
+    }
+});
+
+app.post('/friends/request', requireAuth, async (req: Request, res: Response) => {
+    const { publicKey } = req.body;
+    if (!publicKey) {
+        res.status(400).json({ success: false, message: 'Public key is required.' });
+        return;
+    }
+    try {
+        await FriendController.sendFriendRequest(req.session.userId!, publicKey);
+        res.json({ success: true, message: 'Friend request sent.' });
+    } catch (error: any) {
+        res.status(400).json({ success: false, message: error.message });
+    }
+});
+
+app.post('/friends/accept/:requestId', requireAuth, async (req: Request, res: Response) => {
+    try {
+        await FriendController.acceptFriendRequest(req.params.requestId, req.session.userId!);
+        res.json({ success: true, message: 'Friend request accepted.' });
+    } catch (error: any) {
+        res.status(400).json({ success: false, message: error.message });
+    }
+});
+
+app.post('/friends/decline/:requestId', requireAuth, async (req: Request, res: Response) => {
+    try {
+        await FriendController.declineFriendRequest(req.params.requestId, req.session.userId!);
+        res.json({ success: true, message: 'Friend request declined.' });
+    } catch (error: any) {
+        res.status(400).json({ success: false, message: error.message });
+    }
+});
+
+// JSON endpoint used by the chat friend-picker
+app.get('/friends/list', requireAuth, async (req: Request, res: Response) => {
+    try {
+        const friends = await FriendController.getFriends(req.session.userId!);
+        res.json({
+            success: true,
+            friends: (friends as any[]).map(f => ({ id: f._id.toString(), username: f.username })),
+        });
+    } catch (error: any) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// ── Chat routes ─────────────────────────────────────────────────────────────
+
+app.get('/chat', requireAuth, async (req: Request, res: Response) => {
+    try {
+        const userId = req.session.userId!;
+        const conversations = await ChatController.getConversationsForUser(userId);
+        const serialized = conversations.map((c: any) => ({
+            id: c._id.toString(),
+            otherUsername: c.other?.username ?? 'Unknown',
+            lastMessageAt: c.lastMessageAt
+                ? new Date(c.lastMessageAt).toLocaleString()
+                : null,
+            pinned: c.pinned,
+        }));
+        res.render('chat', { title: 'Chat', script: 'chat', conversations: serialized, currentUserId: userId });
+    } catch (error) {
+        console.error('Error loading chat page:', error);
+        res.status(500).send('Internal server error.');
+    }
+});
+
+// Start or open a conversation with a friend by their userId
+app.post('/chat/start', requireAuth, async (req: Request, res: Response) => {
+    const { friendId } = req.body;
+    if (!friendId) {
+        res.status(400).json({ success: false, message: 'friendId is required.' });
+        return;
+    }
+    try {
+        const conv = await ChatController.getOrCreateConversation(req.session.userId!, friendId);
+        res.json({ success: true, conversationId: conv._id.toString() });
+    } catch (error: any) {
+        res.status(400).json({ success: false, message: error.message });
+    }
+});
+
+// Get messages for a conversation
+app.get('/chat/:conversationId/messages', requireAuth, async (req: Request, res: Response) => {
+    try {
+        const messages = await ChatController.getMessages(
+            req.params.conversationId,
+            req.session.userId!
+        );
+        const serialized = messages.map((m: any) => ({
+            id: m._id.toString(),
+            senderUsername: m.senderId?.username ?? 'Unknown',
+            senderId: m.senderId?._id?.toString(),
+            content: m.deletedAt ? null : m.content,
+            deleted: !!m.deletedAt,
+            createdAt: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        }));
+        res.json({ success: true, messages: serialized });
+    } catch (error: any) {
+        res.status(400).json({ success: false, message: error.message });
+    }
+});
+
+// Send a message
+app.post('/chat/:conversationId/messages', requireAuth, async (req: Request, res: Response) => {
+    const { content } = req.body;
+    if (!content) {
+        res.status(400).json({ success: false, message: 'content is required.' });
+        return;
+    }
+    try {
+        const message = await ChatController.sendMessage(
+            req.params.conversationId,
+            req.session.userId!,
+            content
+        );
+        res.json({ success: true, messageId: message._id.toString() });
+    } catch (error: any) {
+        res.status(400).json({ success: false, message: error.message });
+    }
+});
+
+// Soft-delete a message
+app.delete('/chat/:conversationId/messages/:messageId', requireAuth, async (req: Request, res: Response) => {
+    try {
+        await ChatController.deleteMessage(req.params.messageId, req.session.userId!);
+        res.json({ success: true });
+    } catch (error: any) {
+        res.status(400).json({ success: false, message: error.message });
+    }
+});
+
+// Toggle pin
+app.post('/chat/:conversationId/pin', requireAuth, async (req: Request, res: Response) => {
+    try {
+        const result = await ChatController.togglePin(
+            req.params.conversationId,
+            req.session.userId!
+        );
+        res.json({ success: true, ...result });
+    } catch (error: any) {
+        res.status(400).json({ success: false, message: error.message });
+    }
+});
+
+// Get the other participant's armored public key for E2E encryption
+app.get('/chat/:conversationId/recipient-key', requireAuth, async (req: Request, res: Response) => {
+    try {
+        const userId = req.session.userId!;
+        const ConversationModel = (await import('./Models/ConversationModel')).default;
+        const conv = await ConversationModel.findById(req.params.conversationId)
+            .populate('participants', 'publicKeyArmored username');
+        if (!conv) {
+            res.status(404).json({ success: false, message: 'Conversation not found.' });
+            return;
+        }
+        const other = (conv.participants as any[]).find(
+            (p: any) => p._id.toString() !== userId
+        );
+        if (!other) {
+            res.status(404).json({ success: false, message: 'Recipient not found.' });
+            return;
+        }
+        if (!other.publicKeyArmored) {
+            res.status(400).json({ success: false, message: 'Recipient has no armored public key stored. They must re-register.' });
+            return;
+        }
+        res.json({ success: true, publicKeyArmored: other.publicKeyArmored });
+    } catch (error: any) {
+        res.status(500).json({ success: false, message: error.message });
+    }
 });
 
 app.get('/login', (req: Request, res: Response) => {
@@ -138,10 +335,10 @@ app.post('/signup/generate', (req: Request, res: Response) => {
         res.status(400).json({ success: false, message: 'Public key and username are required.' });
         return;
     }
-    // Normalize the public key by removing all whitespace
+    // Normalize the public key by removing all whitespace (for dedup lookup)
     const normalizedPublicKey = publicKey.replace(/\s/g, '');
 
-    UserController.createUser(normalizedPublicKey, username)
+    UserController.createUser(normalizedPublicKey, username, publicKey)
         .then(() => {
             console.log('User created successfully with public key:', normalizedPublicKey);
             res.json({ success: true }); // Respond with JSON on success
@@ -164,13 +361,15 @@ app.post('/signup/import', (req: Request, res: Response) => {
     const publicKey = req.body.publicKey; // Assuming public key is sent in the body
     const username = req.body.username; // Assuming username is sent in the body
     if (!publicKey || !username) {
-        res.status(400).json({ success: false, message: 'Public key and username are required.' });    
+        res.status(400).json({ success: false, message: 'Public key and username are required.' });
+        return;
     }
     // Call UserController to create a new user with the provided public key and username
-    UserController.createUser(publicKey, username)
+    const normalizedImportKey = publicKey.replace(/\s/g, '');
+    UserController.createUser(normalizedImportKey, username, publicKey)
         .then(() => {
             console.log('User created successfully with public key:', publicKey);
-            res.redirect('/profile'); // Redirect to profile after import
+            res.json({ success: true });
         })
         .catch((error) => {
             console.error('Error creating user:', error);

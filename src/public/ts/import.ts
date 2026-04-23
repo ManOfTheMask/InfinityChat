@@ -58,7 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const result = await response.json();
 
             if (result.success) {
-                window.location.href = '/profile';
+                window.location.href = '/login';
             } else {
                 errorMessageDiv.textContent = `Error: ${result.message}`;
             }
