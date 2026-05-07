@@ -53,7 +53,7 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 //init database connection here
-const dbUri = process.env.MONGO_URI || 'mongodb://localhost:27017/infinitychat'; // Use a default URI if not set in environment variables
+const dbUri = process.env.MONGO_URI || 'mongodb://localhost:27017/keepquiet'; // Use a default URI if not set in environment variables
 if (!dbUri) {
     console.error('MONGO_URI is not defined in the environment variables.');
     process.exit(1); // Exit the process if MONGO_URI is not set
