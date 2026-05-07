@@ -1,15 +1,15 @@
-# InfinityChat
+# KeepQuiet
 
 > **⚠ Work in progress — not yet at v1.0**
 
-InfinityChat is a self-hostable, end-to-end encrypted messaging application for small to medium groups. All encryption and decryption happens entirely in the browser using [OpenPGP.js](https://openpgpjs.org/). The server never sees plaintext messages or private keys — it only stores ciphertext and public keys.
+KeepQuiet is a self-hostable, end-to-end encrypted messaging application for small to medium groups. All encryption and decryption happens entirely in the browser using [OpenPGP.js](https://openpgpjs.org/). The server never sees plaintext messages or private keys — it only stores ciphertext and public keys.
 
 ---
 
 ## How It Works
 
 ### Authentication
-InfinityChat uses a **PGP challenge-response** authentication flow instead of passwords:
+KeepQuiet uses a **PGP challenge-response** authentication flow instead of passwords:
 
 1. On signup, the browser generates a PGP key pair. The private key is downloaded to your device and never leaves it. The public key is registered with the server.
 2. On login, you upload your private key file and enter your passphrase. The client extracts the public key, requests an encrypted challenge from the server, decrypts it locally, and returns the solution to prove ownership of the private key.
@@ -88,14 +88,14 @@ InfinityChat uses a **PGP challenge-response** authentication flow instead of pa
 
 1. **Clone the repository and install dependencies:**
    ```bash
-   git clone https://github.com/ManOfTheMask/InfinityChat.git
-   cd InfinityChat
+   git clone https://github.com/ManOfTheMask/KeepQuiet.git
+   cd KeepQuiet
    npm install
    ```
 
 2. **Create a `.env` file** in the project root:
    ```env
-   MONGO_URI="mongodb://localhost:27017/infinitychat"
+   MONGO_URI="mongodb://localhost:27017/KeepQuiet"
    SESSION_SECRET="your-session-secret"
    ```
 
