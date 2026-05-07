@@ -19,36 +19,60 @@ function hasCredentials(): boolean { return !!pgpPrivateKey() && !!pgpPassphrase
 
 // ── WebSocket ─────────────────────────────────────────────────────────────────
 const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-const chatWs = new WebSocket(`${wsProtocol}//${window.location.host}/ws`);
 
-chatWs.onmessage = async (event: MessageEvent) => {
-    let data: any;
-    try { data = JSON.parse(event.data); } catch { return; }
+let chatWs: WebSocket;
+let wsReconnectDelay = 1000; // ms, doubles on each failed attempt up to 30 s
 
-    if (data.type === 'new_message') {
-        if (renderedMessageIds.has(data.message.id)) return; // deduplicate
-        renderedMessageIds.add(data.message.id);
-        if (data.conversationId === activeConversationId) {
-            const el = await buildMessageEl(data.message);
-            messagesContainer.appendChild(el);
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+function connectChatWs() {
+    chatWs = new WebSocket(`${wsProtocol}//${window.location.host}/ws`);
+
+    chatWs.onopen = () => {
+        wsReconnectDelay = 1000; // reset backoff on successful connection
+    };
+
+    chatWs.onmessage = async (event: MessageEvent) => {
+        // Respond to server keep-alive pings
+        if (event.data === '__ping__') {
+            chatWs.send('__pong__');
+            return;
         }
-    }
 
-    if (data.type === 'message_deleted') {
-        if (data.conversationId === activeConversationId) {
-            const el = messagesContainer.querySelector<HTMLElement>(`[data-message-id="${data.messageId}"]`);
-            if (el) {
-                const bubble = el.querySelector('div')!;
-                bubble.className = 'relative max-w-sm px-4 py-2 rounded-2xl text-sm shadow bg-base-200 text-base-content/40 italic';
-                bubble.innerHTML = '<span class="block text-xs font-semibold mb-1 opacity-70">Deleted</span><span>This message was deleted.</span>';
+        let data: any;
+        try { data = JSON.parse(event.data); } catch { return; }
+
+        if (data.type === 'new_message') {
+            if (renderedMessageIds.has(data.message.id)) return; // deduplicate
+            renderedMessageIds.add(data.message.id);
+            if (data.conversationId === activeConversationId) {
+                const el = await buildMessageEl(data.message);
+                messagesContainer.appendChild(el);
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
             }
         }
-    }
-};
 
-chatWs.onerror = () => console.warn('[WS] Connection error');
-chatWs.onclose = () => console.warn('[WS] Connection closed');
+        if (data.type === 'message_deleted') {
+            if (data.conversationId === activeConversationId) {
+                const el = messagesContainer.querySelector<HTMLElement>(`[data-message-id="${data.messageId}"]`);
+                if (el) {
+                    const bubble = el.querySelector('div')!;
+                    bubble.className = 'relative max-w-sm px-4 py-2 rounded-2xl text-sm shadow bg-base-200 text-base-content/40 italic';
+                    bubble.innerHTML = '<span class="block text-xs font-semibold mb-1 opacity-70">Deleted</span><span>This message was deleted.</span>';
+                }
+            }
+        }
+    };
+
+    chatWs.onerror = () => console.warn('[WS] Connection error');
+    chatWs.onclose = () => {
+        console.warn(`[WS] Connection closed — reconnecting in ${wsReconnectDelay / 1000}s`);
+        setTimeout(() => {
+            connectChatWs();
+            wsReconnectDelay = Math.min(wsReconnectDelay * 2, 30_000);
+        }, wsReconnectDelay);
+    };
+}
+
+connectChatWs();
 
 // ── Element refs ──────────────────────────────────────────────────────────────
 const conversationList   = document.getElementById('conversationList')    as HTMLUListElement;

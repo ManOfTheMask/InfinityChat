@@ -600,10 +600,31 @@ wss.on('connection', (ws, req) => {
         }
         const userId = sess.userId;
         addUserSocket(userId, ws);
+
+        // Track whether this client is still alive between pings
+        (ws as any).isAlive = true;
+        ws.on('message', (data) => {
+            if (data.toString() === '__pong__') (ws as any).isAlive = true;
+        });
+
         ws.on('close', () => removeUserSocket(userId, ws));
         ws.on('error', () => removeUserSocket(userId, ws));
     });
 });
+
+// Ping all clients every 30 s; terminate any that haven't responded since the last ping
+const wsPingInterval = setInterval(() => {
+    for (const ws of wss.clients) {
+        if ((ws as any).isAlive === false) {
+            ws.terminate();
+            continue;
+        }
+        (ws as any).isAlive = false;
+        ws.send('__ping__');
+    }
+}, 30_000);
+
+wss.on('close', () => clearInterval(wsPingInterval));
 
 server.listen(port, () => {
     console.log(`Server is running on http://localhost:${port}`);
