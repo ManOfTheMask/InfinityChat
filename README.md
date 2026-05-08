@@ -1,3 +1,7 @@
+<p align="center">
+   <img src="/src/public/img/LogoFull.png" alt="KeepQuiet logo" />
+</p>
+
 # KeepQuiet
 
 > **⚠ Work in progress — not yet at v1.0**
