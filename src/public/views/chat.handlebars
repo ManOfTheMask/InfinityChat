@@ -24,7 +24,7 @@
     </div>
 
     <!-- Mobile sidebar backdrop -->
-    <div id="sidebarBackdrop" onclick="closeSidebar()"></div>
+    <div id="sidebarBackdrop"></div>
 
     <!-- Sidebar: conversation list -->
     <aside id="sidebar" class="w-72 flex-shrink-0 bg-base-100 border-r border-base-300 flex flex-col">
@@ -107,29 +107,31 @@
 </div>
 
 <script>
-function openSidebar() {
-    document.getElementById('sidebar').classList.add('sidebar-open');
-    document.getElementById('sidebarBackdrop').classList.add('sidebar-open');
-}
-function closeSidebar() {
-    document.getElementById('sidebar').classList.remove('sidebar-open');
-    document.getElementById('sidebarBackdrop').classList.remove('sidebar-open');
-}
-
-document.getElementById('sidebarToggle').addEventListener('click', function() {
+(function() {
     var sidebar = document.getElementById('sidebar');
-    if (sidebar.classList.contains('sidebar-open')) {
-        closeSidebar();
-    } else {
-        openSidebar();
-    }
-});
+    var backdrop = document.getElementById('sidebarBackdrop');
+    var mobileQuery = window.matchMedia('(max-width: 639px)');
 
-document.getElementById('conversationList').addEventListener('click', function() {
-    if (window.innerWidth < 640) {
-        closeSidebar();
+    function toggleSidebar() {
+        sidebar.classList.toggle('sidebar-open');
+        backdrop.classList.toggle('sidebar-open');
     }
-});
+
+    function closeSidebar() {
+        sidebar.classList.remove('sidebar-open');
+        backdrop.classList.remove('sidebar-open');
+    }
+
+    document.getElementById('sidebarToggle').addEventListener('click', toggleSidebar);
+
+    document.getElementById('conversationList').addEventListener('click', function(e) {
+        if (mobileQuery.matches && e.target.closest('.conversation-item')) {
+            closeSidebar();
+        }
+    });
+
+    backdrop.addEventListener('click', closeSidebar);
+})();
 </script>
 
 <script type="module" src="/js/chat.js"></script>
