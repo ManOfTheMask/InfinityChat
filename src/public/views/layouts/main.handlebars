@@ -7,20 +7,20 @@
     <link rel="stylesheet" href="/css/output.css">
     <title>{{title}}</title>
 </head>
-<body class="bg-base-300">
-    <header>
-        <nav class="navbar bg-base-100 shadow-sm">
+<body class="bg-base-300 flex flex-col min-h-screen">
+    <header class="shrink-0">
+        <nav class="navbar bg-base-100 shadow-sm sticky top-0 z-50">
             <div class="flex-1">
                 <a href="/" class="btn btn-ghost p-0 h-auto min-h-0" aria-label="KeepQuiet Home">
-                    <img src="/img/Logo.png" alt="KeepQuiet Logo" class="h-20 w-auto">
+                    <img src="/img/Logo.png" alt="KeepQuiet Logo" class="h-10 w-auto">
                 </a>
             </div>
             <div class="flex-none">
                 <ul class="menu menu-horizontal px-1">
                     <li>
                         <details>
-                            <summary>Menu</summary>
-                            <ul class="bg-base-100 rounded-t-none p-2 z-[100]">
+                            <summary class="font-medium">Menu</summary>
+                            <ul class="bg-base-100 rounded-box shadow-lg p-2 z-[100] right-0 min-w-48">
                                 <li><a href="/">Home</a></li>
                                 <li><a href="/profile">Profile</a></li>
                                 <li><a href="/friends">Friends List</a></li>
@@ -35,11 +35,11 @@
             </div>
         </nav>
     </header>
-    <main>
+    <main class="flex-1 flex flex-col min-h-0">
         {{{body}}}
     </main>
-    <footer class="bg-base-100 p-4">
-        <p class="text-center">KeepQuiet made by V01D &mdash; <a href="https://github.com/ManOfTheMask/KeepQuiet" class="link link-hover" target="_blank" rel="noopener noreferrer">GitHub</a></p>
+    <footer class="shrink-0 bg-base-100 border-t border-base-300 p-4">
+        <p class="text-center text-sm text-base-content/60">KeepQuiet made by V01D &mdash; <a href="https://github.com/ManOfTheMask/KeepQuiet" class="link link-hover" target="_blank" rel="noopener noreferrer">GitHub</a></p>
     </footer>
     {{!-- Only load the page-specific JS, not PGPUtils.js directly --}}
     {{#if script}}

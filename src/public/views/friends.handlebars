@@ -1,53 +1,56 @@
-<div class="flex flex-col items-center justify-center w-screen h-screen relative">
-
-    <button id="addFriendBtn" class="btn btn-primary mb-4 absolute top-8 right-8 z-20">Add Friend</button>
+<div class="flex flex-col flex-1 px-4 py-8">
 
     <!-- Add Friend Modal -->
-    <div id="addFriendModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 hidden">
-        <div class="bg-base-100 p-8 rounded-lg shadow-lg w-96">
-            <h2 class="text-2xl mb-4">Add a Friend</h2>
+    <div id="addFriendModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 hidden p-4">
+        <div class="bg-base-100 p-6 sm:p-8 rounded-2xl shadow-xl w-full max-w-md">
+            <h2 class="text-xl font-bold mb-4">Add a Friend</h2>
             <p id="modalMessage" class="text-sm mb-3 hidden"></p>
             <textarea id="publicKeyInput" placeholder="Paste their PGP public key here..." class="textarea textarea-bordered w-full mb-4 h-32 font-mono text-xs"></textarea>
             <div class="flex justify-end gap-2">
-                <button id="closeModalBtn" class="btn btn-secondary">Cancel</button>
+                <button id="closeModalBtn" class="btn btn-ghost">Cancel</button>
                 <button id="sendRequestBtn" class="btn btn-primary">Send Request</button>
             </div>
         </div>
     </div>
 
-    <div id="mainContent" class="bg-base-200 shadow-lg p-8 rounded-lg text-center w-9/10 h-4/5 overflow-y-auto transition-all duration-300">
-        <h1 class="text-base-content text-4xl mb-6">Friends</h1>
+    <div class="w-full max-w-2xl mx-auto">
+        <div class="flex items-center justify-between mb-6">
+            <h1 class="text-base-content text-2xl sm:text-3xl font-bold">Friends</h1>
+            <button id="addFriendBtn" class="btn btn-primary btn-sm sm:btn-md">+ Add Friend</button>
+        </div>
 
-        {{#if incomingRequests.length}}
-        <div class="mb-8">
-            <h2 class="text-2xl mb-4 text-left">Pending Requests</h2>
-            <ul class="flex flex-col gap-2">
-                {{#each incomingRequests}}
-                <li class="flex items-center justify-between bg-base-100 rounded-lg px-4 py-3" data-request-id="{{this.requestId}}">
-                    <span class="font-medium">{{this.username}}</span>
-                    <div class="flex gap-2">
-                        <button class="btn btn-success btn-sm acceptBtn">Accept</button>
-                        <button class="btn btn-error btn-sm declineBtn">Decline</button>
-                    </div>
-                </li>
+        <div id="mainContent" class="bg-base-200 shadow-xl p-6 rounded-2xl transition-all duration-300">
+            {{#if incomingRequests.length}}
+            <div class="mb-8">
+                <h2 class="text-lg font-semibold mb-3">Pending Requests</h2>
+                <ul class="flex flex-col gap-2">
+                    {{#each incomingRequests}}
+                    <li class="flex items-center justify-between bg-base-100 rounded-xl px-4 py-3 shadow-sm" data-request-id="{{this.requestId}}">
+                        <span class="font-medium">{{this.username}}</span>
+                        <div class="flex gap-2">
+                            <button class="btn btn-success btn-sm acceptBtn">Accept</button>
+                            <button class="btn btn-error btn-sm declineBtn">Decline</button>
+                        </div>
+                    </li>
+                    {{/each}}
+                </ul>
+            </div>
+            {{/if}}
+
+            <h2 class="text-lg font-semibold mb-3">Friends List</h2>
+            <ul id="friendsList" class="flex flex-col gap-2">
+                {{#each friends}}
+                    <li class="flex items-center justify-between bg-base-100 rounded-xl px-4 py-3 shadow-sm" data-friend-id="{{this.id}}">
+                        <div class="flex flex-col items-start">
+                            <span class="font-semibold text-base">{{this.username}}</span>
+                        </div>
+                        <button class="btn btn-primary btn-sm messageBtn">Message</button>
+                    </li>
+                {{else}}
+                    <li class="text-base-content/60 list-none py-4 text-center">No friends added yet. Add one to get started!</li>
                 {{/each}}
             </ul>
         </div>
-        {{/if}}
-
-        <h2 class="text-2xl mb-4 text-left">Friends List</h2>
-        <ul id="friendsList" class="flex flex-col gap-2">
-            {{#each friends}}
-                <li class="flex items-center justify-between bg-base-100 rounded-lg px-4 py-3" data-friend-id="{{this.id}}">
-                    <div class="flex flex-col items-start">
-                        <span class="font-semibold text-base">{{this.username}}</span>
-                    </div>
-                    <button class="btn btn-primary btn-sm messageBtn">Message</button>
-                </li>
-            {{else}}
-                <li class="text-base-content/60 list-none py-4">No friends added yet.</li>
-            {{/each}}
-        </ul>
     </div>
 </div>
 
