@@ -9,6 +9,7 @@ import mongoose from 'mongoose';
 import UserController from './Controllers/UserController';
 import FriendController from './Controllers/FriendController';
 import ChatController from './Controllers/ChatController';
+import NotificationController from './Controllers/NotificationController';
 import ConversationModel from './Models/ConversationModel';
 import dotenv from 'dotenv';
 import session from 'express-session';
@@ -145,6 +146,12 @@ function requireAuth(req: Request, res: Response, next: any) {
     }
 }
 
+// Inject current user into every template's locals
+app.use((req: Request, res: Response, next: any) => {
+    res.locals.currentUserId = req.session.userId ?? null;
+    next();
+});
+
 // Serve the index.html for / route
 app.get('/', (req: Request, res: Response) => {
     res.render('home', { title: 'Home', script: 'home' });
@@ -204,7 +211,29 @@ app.post('/friends/request', requireAuth, async (req: Request, res: Response) =>
         return;
     }
     try {
-        await FriendController.sendFriendRequest(req.session.userId!, publicKey);
+        const request = await FriendController.sendFriendRequest(req.session.userId!, publicKey);
+        const sender = await UserController.getUserById(req.session.userId!);
+        if (sender) {
+            const notif = await NotificationController.create(
+                (request.toUserId as any).toString(),
+                'friend_request',
+                'New friend request',
+                `${sender.username} sent you a friend request.`,
+                '/friends',
+            );
+            broadcastToUser((request.toUserId as any).toString(), {
+                type: 'new_notification',
+                notification: {
+                    id: notif._id.toString(),
+                    type: notif.type,
+                    title: notif.title,
+                    body: notif.body,
+                    link: notif.link,
+                    read: notif.read,
+                    createdAt: notif.createdAt,
+                },
+            });
+        }
         res.json({ success: true, message: 'Friend request sent.' });
     } catch (error: any) {
         res.status(400).json({ success: false, message: error.message });
@@ -336,6 +365,31 @@ app.post('/chat/:conversationId/messages', requireAuth, async (req: Request, res
             for (const participantId of conv.participants as any[]) {
                 broadcastToUser(participantId.toString(), wsMsg);
             }
+
+            // Create and push a notification to every participant except the sender
+            for (const participantId of conv.participants as any[]) {
+                const pid = participantId.toString();
+                if (pid === req.session.userId!) continue;
+                const notif = await NotificationController.create(
+                    pid,
+                    'message',
+                    `New message from ${sender.username}`,
+                    '',
+                    `/chat?open=${req.params.conversationId}`,
+                );
+                broadcastToUser(pid, {
+                    type: 'new_notification',
+                    notification: {
+                        id: notif._id.toString(),
+                        type: notif.type,
+                        title: notif.title,
+                        body: notif.body,
+                        link: notif.link,
+                        read: notif.read,
+                        createdAt: notif.createdAt,
+                    },
+                });
+            }
         }
 
         res.json({ success: true, messageId: message._id.toString() });
@@ -420,6 +474,48 @@ app.get('/chat/:conversationId/recipient-key', requireAuth, async (req: Request,
         res.json({ success: true, publicKeyArmored: other.publicKeyArmored });
     } catch (error: any) {
         res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// ── Notification routes ──────────────────────────────────────────────────────
+
+// List all notifications for the current user
+app.get('/notifications', requireAuth, async (req: Request, res: Response) => {
+    try {
+        const notifications = await NotificationController.getForUser(req.session.userId!);
+        res.json({ success: true, notifications });
+    } catch (error: any) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// Mark a single notification as read
+app.post('/notifications/:id/read', requireAuth, async (req: Request, res: Response) => {
+    try {
+        await NotificationController.markRead(req.params.id, req.session.userId!);
+        res.json({ success: true });
+    } catch (error: any) {
+        res.status(400).json({ success: false, message: error.message });
+    }
+});
+
+// Mark all notifications as read
+app.post('/notifications/read-all', requireAuth, async (req: Request, res: Response) => {
+    try {
+        await NotificationController.markAllRead(req.session.userId!);
+        res.json({ success: true });
+    } catch (error: any) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// Dismiss (delete) a notification
+app.delete('/notifications/:id', requireAuth, async (req: Request, res: Response) => {
+    try {
+        await NotificationController.dismiss(req.params.id, req.session.userId!);
+        res.json({ success: true });
+    } catch (error: any) {
+        res.status(400).json({ success: false, message: error.message });
     }
 });
 
