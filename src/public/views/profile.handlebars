@@ -1,17 +1,18 @@
-<div class="flex flex-col items-center justify-center w-screen h-screen">
-    <div class="bg-base-200 shadow-lg p-8 rounded-lg text-center w-1/3 h-2/3 overflow-y-auto">
-       <div class="flex flex-col items-center text-base-content text-4xl mb-4">
-            <img src="/img/profileplaceholder.jpg" alt="Profile Picture" class="w-24 h-24 rounded-full mb-4">
-            <h2 class="text-base-content text-4xl mt-2">Username: {{username}}</h2>
-            <h2 class="text-base-content text-lg mt-2">Member since: {{createdAt}}</h2>
-            <div class="w-full mt-2 rounded-md overflow-hidden border border-base-300">
-                <div class="relative flex items-center bg-neutral px-3 py-1">
-                    <span class="absolute left-1/2 -translate-x-1/2 text-neutral-content text-xs font-mono">PGP PUBLIC KEY</span>
-                    <button onclick="copyPublicKey()" class="btn btn-xs btn-ghost text-neutral-content font-mono ml-auto" id="copy-btn">copy</button>
-                </div>
-                <pre class="bg-base-300 text-base-content text-xs font-mono p-3 text-left whitespace-pre-wrap break-all" id="public-key-text">{{publicKey}}</pre>
+<div class="flex flex-col items-center justify-center flex-1 px-4 py-10">
+    <div class="bg-base-200 shadow-xl p-6 sm:p-10 rounded-2xl w-full max-w-2xl overflow-y-auto">
+        <div class="flex flex-col items-center">
+            <img src="/img/profileplaceholder.jpg" alt="Profile Picture" class="w-24 h-24 rounded-full mb-4 shadow-md">
+            <h2 class="text-base-content text-2xl sm:text-3xl font-bold mt-2">{{username}}</h2>
+            <p class="text-base-content/60 text-sm mt-1">Member since: {{createdAt}}</p>
+        </div>
+
+        <div class="mt-6 w-full rounded-xl overflow-hidden border border-base-300">
+            <div class="relative flex items-center bg-neutral px-3 py-2">
+                <span class="absolute left-1/2 -translate-x-1/2 text-neutral-content text-xs font-mono font-semibold tracking-wide">PGP PUBLIC KEY</span>
+                <button onclick="copyPublicKey()" class="btn btn-xs btn-ghost text-neutral-content font-mono ml-auto" id="copy-btn">copy</button>
             </div>
-       </div>
+            <pre class="bg-base-300 text-base-content text-xs font-mono p-4 text-left whitespace-pre-wrap break-all max-h-64 overflow-y-auto" id="public-key-text">{{publicKey}}</pre>
+        </div>
     </div>
 </div>
 <!-- The compiled JavaScript will be served from /js/page2.js -->
@@ -61,4 +62,3 @@ function copyPublicKey() {
     });
 }
 </script>
-

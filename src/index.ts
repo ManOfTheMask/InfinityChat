@@ -272,6 +272,10 @@ app.post('/chat/start', requireAuth, async (req: Request, res: Response) => {
     }
     try {
         const conv = await ChatController.getOrCreateConversation(req.session.userId!, friendId);
+        // If this user previously closed (hid) the conversation, un-hide it now
+        await ConversationModel.findByIdAndUpdate(conv._id, {
+            $pull: { hiddenBy: new mongoose.Types.ObjectId(req.session.userId!) },
+        });
         res.json({ success: true, conversationId: conv._id.toString() });
     } catch (error: any) {
         res.status(400).json({ success: false, message: error.message });
@@ -372,6 +376,21 @@ app.post('/chat/:conversationId/pin', requireAuth, async (req: Request, res: Res
             req.session.userId!
         );
         res.json({ success: true, ...result });
+    } catch (error: any) {
+        res.status(400).json({ success: false, message: error.message });
+    }
+});
+
+// Close (and optionally delete all messages in) a conversation
+app.delete('/chat/:conversationId', requireAuth, async (req: Request, res: Response) => {
+    try {
+        const deleteMessages = req.body.deleteMessages === true;
+        await ChatController.closeConversation(
+            req.params.conversationId,
+            req.session.userId!,
+            deleteMessages,
+        );
+        res.json({ success: true });
     } catch (error: any) {
         res.status(400).json({ success: false, message: error.message });
     }
