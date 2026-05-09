@@ -16,6 +16,7 @@ export default defineConfig({
         import: resolve(__dirname, 'src/public/ts/import.ts'),
         login: resolve(__dirname, 'src/public/ts/login.ts'),
         chat: resolve(__dirname, 'src/public/ts/chat.ts'),
+        notifications: resolve(__dirname, 'src/public/ts/notifications.ts'),
       },
       output: {
         entryFileNames: 'js/[name].js',

@@ -16,7 +16,29 @@
                 </a>
             </div>
             <div class="flex-none">
-                <ul class="menu menu-horizontal px-1">
+                <ul class="menu menu-horizontal px-1 items-center">
+                    {{#if currentUserId}}
+                    <li>
+                        <!-- Notification bell -->
+                        <div class="dropdown dropdown-end">
+                            <button tabindex="0" id="notifBell" class="btn btn-ghost btn-sm relative" aria-label="Notifications">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                                </svg>
+                                <span id="notifBadge" class="badge badge-error badge-xs absolute -top-0.5 -right-0.5 hidden">0</span>
+                            </button>
+                            <div tabindex="0" id="notifDropdown" class="dropdown-content z-[200] bg-base-100 shadow-xl rounded-box w-80 mt-1 flex flex-col max-h-[28rem] overflow-hidden">
+                                <div class="flex items-center justify-between px-4 py-3 border-b border-base-300 shrink-0">
+                                    <span class="font-semibold text-sm">Notifications</span>
+                                    <button id="notifMarkAllRead" class="btn btn-ghost btn-xs text-xs">Mark all read</button>
+                                </div>
+                                <ul id="notifList" class="overflow-y-auto flex-1">
+                                    <li class="text-center text-sm text-base-content/40 py-6">Loading…</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </li>
+                    {{/if}}
                     <li>
                         <details>
                             <summary class="font-medium">Menu</summary>
@@ -44,6 +66,9 @@
     {{!-- Only load the page-specific JS, not PGPUtils.js directly --}}
     {{#if script}}
       <script type="module" src="/js/{{script}}.js"></script>
+    {{/if}}
+    {{#if currentUserId}}
+      <script type="module" src="/js/notifications.js"></script>
     {{/if}}
 </body>
 </html>
