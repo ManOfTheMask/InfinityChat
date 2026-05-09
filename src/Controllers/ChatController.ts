@@ -26,6 +26,7 @@ class ChatController {
             .lean();
 
         return conversations
+            .filter((c: any) => !(c.hiddenBy ?? []).some((p: any) => p.equals(uid)))
             .map((c: any) => ({
                 ...c,
                 pinned: c.pinnedBy.some((p: any) => p.equals(uid)),
@@ -90,6 +91,28 @@ class ChatController {
         msg.deletedAt = new Date();
         await msg.save();
         return msg;
+    }
+
+    /** Close (hide) a conversation for the calling user; optionally soft-delete all messages first. */
+    async closeConversation(conversationId: string, userId: string, deleteMessages: boolean) {
+        const cid = new mongoose.Types.ObjectId(conversationId);
+        const uid = new mongoose.Types.ObjectId(userId);
+
+        const conv = await ConversationModel.findById(cid);
+        if (!conv) throw new Error("Conversation not found.");
+        if (!(conv.participants as any[]).some((p: any) => p.equals(uid))) {
+            throw new Error("Unauthorized.");
+        }
+
+        if (deleteMessages) {
+            await MessageModel.updateMany(
+                { conversationId: cid, deletedAt: null },
+                { $set: { deletedAt: new Date() } },
+            );
+        }
+
+        // Mark as hidden for this user (un-hide it if already hidden so the call is idempotent)
+        await ConversationModel.findByIdAndUpdate(cid, { $addToSet: { hiddenBy: uid } });
     }
 
     /** Toggle pin for the calling user on a conversation. */

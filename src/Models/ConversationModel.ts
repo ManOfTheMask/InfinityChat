@@ -10,6 +10,10 @@ const conversationSchema = new mongoose.Schema({
         type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
         default: [],
     },
+    hiddenBy: {
+        type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+        default: [],
+    },
     lastMessageAt: {
         type: Date,
         default: null,

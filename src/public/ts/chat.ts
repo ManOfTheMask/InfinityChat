@@ -84,6 +84,11 @@ const messagesContainer  = document.getElementById('messagesContainer')    as HT
 const messagesPlaceholder = document.getElementById('messagesPlaceholder') as HTMLDivElement | null;
 const messageInput       = document.getElementById('messageInput')         as HTMLTextAreaElement;
 const sendBtn            = document.getElementById('sendBtn')              as HTMLButtonElement;
+const closeChatBtn       = document.getElementById('closeChatBtn')         as HTMLButtonElement;
+const closeChatModal     = document.getElementById('closeChatModal')       as HTMLDialogElement;
+const closeChatDeleteBtn = document.getElementById('closeChatDeleteBtn')   as HTMLButtonElement;
+const closeChatOnlyBtn   = document.getElementById('closeChatOnlyBtn')     as HTMLButtonElement;
+const closeChatCancelBtn = document.getElementById('closeChatCancelBtn')   as HTMLButtonElement;
 
 // ── Conversation list: click to open ─────────────────────────────────────────
 conversationList.addEventListener('click', (e) => {
@@ -111,6 +116,7 @@ async function openConversation(id: string, item: HTMLElement) {
     activeReceiverPublicKey = null;
     chatHeaderName.textContent = item.querySelector('.font-medium')?.textContent ?? 'Chat';
     chatHeaderName.classList.remove('text-base-content/40', 'italic');
+    closeChatBtn.classList.remove('hidden');
 
     messageInput.disabled = false;
     sendBtn.disabled = false;
@@ -424,6 +430,49 @@ if (openId) {
     const target = conversationList.querySelector<HTMLElement>(`.conversation-item[data-id="${openId}"]`);
     if (target) openConversation(openId, target);
 }
+
+// ── Close chat ────────────────────────────────────────────────────────────────
+closeChatBtn.onclick = () => {
+    if (!activeConversationId) return;
+    closeChatModal.showModal();
+};
+
+closeChatCancelBtn.onclick = () => closeChatModal.close();
+
+async function doCloseChat(deleteMessages: boolean) {
+    if (!activeConversationId) return;
+    const convId = activeConversationId;
+    closeChatModal.close();
+
+    try {
+        const res = await fetch(`/chat/${convId}`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ deleteMessages }),
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message);
+
+        // Remove from sidebar
+        const item = conversationList.querySelector<HTMLElement>(`.conversation-item[data-id="${convId}"]`);
+        item?.remove();
+
+        // Reset chat panel
+        activeConversationId = null;
+        activeReceiverPublicKey = null;
+        chatHeaderName.textContent = 'Select a chat';
+        chatHeaderName.classList.add('text-base-content/40', 'italic');
+        closeChatBtn.classList.add('hidden');
+        messagesContainer.innerHTML = '<div id="messagesPlaceholder" class="m-auto text-base-content/30 text-sm select-none">Open a conversation to start chatting</div>';
+        messageInput.disabled = true;
+        sendBtn.disabled = true;
+    } catch (err: any) {
+        alert(err.message);
+    }
+}
+
+closeChatDeleteBtn.onclick = () => doCloseChat(true);
+closeChatOnlyBtn.onclick   = () => doCloseChat(false);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function escHtml(str: string) {
