@@ -13,6 +13,18 @@
         </div>
     </div>
 
+    <!-- Remove Friend Confirmation Modal -->
+    <div id="removeFriendModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 hidden p-4">
+        <div class="bg-base-100 p-6 sm:p-8 rounded-2xl shadow-xl w-full max-w-md">
+            <h2 class="text-xl font-bold mb-2">Remove Friend</h2>
+            <p class="text-base-content/70 mb-6">Are you sure you want to remove <span id="removeFriendName" class="font-semibold text-base-content"></span>? This will also delete your entire conversation with them.</p>
+            <div class="flex justify-end gap-2">
+                <button id="cancelRemoveBtn" class="btn btn-ghost">Cancel</button>
+                <button id="confirmRemoveBtn" class="btn btn-error">Remove &amp; Delete DMs</button>
+            </div>
+        </div>
+    </div>
+
     <div class="w-full max-w-2xl mx-auto">
         <div class="flex items-center justify-between mb-6">
             <h1 class="text-base-content text-2xl sm:text-3xl font-bold">Friends</h1>
@@ -40,11 +52,14 @@
             <h2 class="text-lg font-semibold mb-3">Friends List</h2>
             <ul id="friendsList" class="flex flex-col gap-2">
                 {{#each friends}}
-                    <li class="flex items-center justify-between bg-base-100 rounded-xl px-4 py-3 shadow-sm" data-friend-id="{{this.id}}">
+                    <li class="flex items-center justify-between bg-base-100 rounded-xl px-4 py-3 shadow-sm" data-friend-id="{{this.id}}" data-friend-name="{{this.username}}">
                         <div class="flex flex-col items-start">
                             <span class="font-semibold text-base">{{this.username}}</span>
                         </div>
-                        <button class="btn btn-primary btn-sm messageBtn">Message</button>
+                        <div class="flex gap-2">
+                            <button class="btn btn-primary btn-sm messageBtn">Message</button>
+                            <button class="btn btn-ghost btn-sm removeBtn text-error">Remove</button>
+                        </div>
                     </li>
                 {{else}}
                     <li class="text-base-content/60 list-none py-4 text-center">No friends added yet. Add one to get started!</li>
