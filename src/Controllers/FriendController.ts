@@ -1,5 +1,7 @@
 import FriendRequestModel from "../Models/FriendRequestModel";
 import UserModel from "../Models/UserModel";
+import ConversationModel from "../Models/ConversationModel";
+import MessageModel from "../Models/MessageModel";
 import mongoose from "mongoose";
 
 class FriendController {
@@ -63,9 +65,6 @@ class FriendController {
             throw new Error("This request has already been resolved.");
         }
 
-        request.status = "accepted";
-        await request.save();
-
         // Add each user to the other's friends list
         await UserModel.findByIdAndUpdate(request.fromUserId, {
             $addToSet: { friends: request.toUserId },
@@ -74,6 +73,7 @@ class FriendController {
             $addToSet: { friends: request.fromUserId },
         });
 
+        await FriendRequestModel.findByIdAndDelete(requestId);
         return request;
     }
 
@@ -93,8 +93,7 @@ class FriendController {
             throw new Error("This request has already been resolved.");
         }
 
-        request.status = "declined";
-        await request.save();
+        await FriendRequestModel.findByIdAndDelete(requestId);
         return request;
     }
 
@@ -114,6 +113,29 @@ class FriendController {
             toUserId: new mongoose.Types.ObjectId(userId),
             status: "pending",
         }).populate("fromUserId", "username publicKey");
+    }
+
+    async removeFriend(userId: string, friendId: string) {
+        if (!userId || !friendId) {
+            throw new Error("User ID and friend ID are required.");
+        }
+
+        const uid = new mongoose.Types.ObjectId(userId);
+        const fid = new mongoose.Types.ObjectId(friendId);
+
+        // Remove each user from the other's friends list
+        await UserModel.findByIdAndUpdate(uid, { $pull: { friends: fid } });
+        await UserModel.findByIdAndUpdate(fid, { $pull: { friends: uid } });
+
+        // Find and delete the conversation + all its messages
+        const conversation = await ConversationModel.findOne({
+            participants: { $all: [uid, fid] },
+        });
+
+        if (conversation) {
+            await MessageModel.deleteMany({ conversationId: conversation._id });
+            await ConversationModel.findByIdAndDelete(conversation._id);
+        }
     }
 }
 

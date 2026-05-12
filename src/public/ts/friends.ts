@@ -122,3 +122,66 @@ async function respondToRequest(requestId: string, action: 'accept' | 'decline',
         alert('Network error. Please try again.');
     }
 }
+
+// Remove friend modal
+const removeFriendModal = document.getElementById('removeFriendModal') as HTMLDivElement;
+const removeFriendName = document.getElementById('removeFriendName') as HTMLSpanElement;
+const cancelRemoveBtn = document.getElementById('cancelRemoveBtn') as HTMLButtonElement;
+const confirmRemoveBtn = document.getElementById('confirmRemoveBtn') as HTMLButtonElement;
+
+let pendingRemoveFriendId: string | null = null;
+let pendingRemoveItem: HTMLElement | null = null;
+
+function showRemoveModal(friendId: string, friendName: string, item: HTMLElement) {
+    pendingRemoveFriendId = friendId;
+    pendingRemoveItem = item;
+    removeFriendName.textContent = friendName;
+    removeFriendModal.classList.remove('hidden');
+    mainContent.classList.add('blur-sm');
+}
+
+function hideRemoveModal() {
+    removeFriendModal.classList.add('hidden');
+    mainContent.classList.remove('blur-sm');
+    pendingRemoveFriendId = null;
+    pendingRemoveItem = null;
+}
+
+cancelRemoveBtn.onclick = hideRemoveModal;
+removeFriendModal.addEventListener('click', (e) => {
+    if (e.target === removeFriendModal) hideRemoveModal();
+});
+
+confirmRemoveBtn.onclick = async () => {
+    if (!pendingRemoveFriendId || !pendingRemoveItem) return;
+
+    const friendId = pendingRemoveFriendId;
+    const item = pendingRemoveItem;
+    confirmRemoveBtn.disabled = true;
+    confirmRemoveBtn.textContent = 'Removing...';
+
+    try {
+        const res = await fetch(`/friends/remove/${friendId}`, { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+            hideRemoveModal();
+            item.remove();
+        } else {
+            alert(data.message || 'Failed to remove friend.');
+        }
+    } catch {
+        alert('Network error. Please try again.');
+    } finally {
+        confirmRemoveBtn.disabled = false;
+        confirmRemoveBtn.textContent = 'Remove & Delete DMs';
+    }
+};
+
+document.querySelectorAll<HTMLButtonElement>('.removeBtn').forEach((btn) => {
+    const item = btn.closest<HTMLElement>('[data-friend-id]')!;
+    btn.onclick = () => {
+        const friendId = item.dataset.friendId!;
+        const friendName = item.dataset.friendName ?? 'this friend';
+        showRemoveModal(friendId, friendName, item);
+    };
+});

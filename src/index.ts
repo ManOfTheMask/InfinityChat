@@ -313,6 +313,15 @@ app.post('/friends/decline/:requestId', requireAuth, async (req: Request, res: R
     }
 });
 
+app.post('/friends/remove/:friendId', requireAuth, async (req: Request, res: Response) => {
+    try {
+        await FriendController.removeFriend(req.session.userId!, req.params.friendId);
+        res.json({ success: true, message: 'Friend removed.' });
+    } catch (error: any) {
+        res.status(400).json({ success: false, message: error.message });
+    }
+});
+
 // JSON endpoint used by the chat friend-picker
 app.get('/friends/list', requireAuth, async (req: Request, res: Response) => {
     try {
