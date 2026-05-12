@@ -220,7 +220,7 @@ Connections that miss two consecutive pings are terminated automatically.
 
 ## Upcoming Features
 
-- **Theme picker** — let users choose from DaisyUI's built-in themes or customise accent colours
+- ~~**Theme picker** — let users choose from DaisyUI's built-in themes or customise accent colours~~
 - **Group chats** — multi-participant conversations with shared group key management
 - **Message reactions** — emoji reactions on individual messages
 - **Read receipts** — show when a message has been seen by the recipient
