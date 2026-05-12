@@ -221,11 +221,12 @@ Connections that miss two consecutive pings are terminated automatically.
 ## Upcoming Features
 
 - ~~**Theme picker** — let users choose from DaisyUI's built-in themes or customise accent colours~~
-- **Group chats** — multi-participant conversations with shared group key management
+- **Group chats** — multi-participant conversations with shared group key management up to 10 people
 - **Message reactions** — emoji reactions on individual messages
 - **Read receipts** — show when a message has been seen by the recipient
 - **File / image sharing** — encrypted attachment support
 - **Notification preferences** — per-conversation mute and global notification settings
+- **E2EE Voice & Video Chat** — E2EE Voice & Video Chat for 10 people
 - **Mobile app** — a native wrapper (e.g. Capacitor or Tauri) around the existing web UI
 
 ---
