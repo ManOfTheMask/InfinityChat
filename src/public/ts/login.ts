@@ -105,7 +105,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (verifyResponse.ok && verifyData.success) {
                 resultOutput.textContent += '\n✓ Authentication successful!';
-                resultOutput.textContent += '\nRedirecting to profile...';
+                resultOutput.textContent += '\nRedirecting to dashboard...';
 
                 // Store private key and passphrase in sessionStorage for E2E encryption
                 const privateKeyArmoredText = await privateKeyFile.text();
@@ -115,7 +115,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 sessionStorage.setItem('pgpPublicKey', publicKey);
 
                 setTimeout(() => {
-                    window.location.href = '/profile';
+                    window.location.href = '/';
                 }, 2000);
             } else {
                 throw new Error(verifyData.message || 'Challenge verification failed');

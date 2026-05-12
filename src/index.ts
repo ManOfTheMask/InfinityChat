@@ -11,6 +11,7 @@ import FriendController from './Controllers/FriendController';
 import ChatController from './Controllers/ChatController';
 import NotificationController from './Controllers/NotificationController';
 import ConversationModel from './Models/ConversationModel';
+import MessageModel from './Models/MessageModel';
 import dotenv from 'dotenv';
 import session from 'express-session';
 import openpgp from 'openpgp'; // Import OpenPGP for cryptographic operations
@@ -116,7 +117,12 @@ function unsignSessionCookie(signed: string, secret: string): string | false {
 }
 
 // Set up Handlebars as the template engine
-app.engine('handlebars', engine());
+app.engine('handlebars', engine({
+    helpers: {
+        eq: (a: any, b: any) => a === b,
+        gt: (a: any, b: any) => a > b,
+    },
+}));
 app.set('view engine', 'handlebars');
 app.set('views', path.join(__dirname, 'public' ,'views'));
 
@@ -153,8 +159,57 @@ app.use((req: Request, res: Response, next: any) => {
 });
 
 // Serve the index.html for / route
-app.get('/', (req: Request, res: Response) => {
-    res.render('home', { title: 'Home', script: 'home' });
+app.get('/', async (req: Request, res: Response) => {
+    if (!req.session.authenticated || !req.session.userId) {
+        res.render('home', { title: 'Home', script: 'home', loggedIn: false });
+        return;
+    }
+    try {
+        const userId = req.session.userId;
+        const [user, pendingRequests, notifications, unreadCount, messagesSent] = await Promise.all([
+            UserController.getUserById(userId),
+            FriendController.getPendingIncomingRequests(userId),
+            NotificationController.getForUser(userId),
+            NotificationController.countUnread(userId),
+            MessageModel.countDocuments({ senderId: userId, deletedAt: null }),
+        ]);
+        if (!user) {
+            res.render('home', { title: 'Home', script: 'home', loggedIn: false });
+            return;
+        }
+        const recentNotifs = notifications.slice(0, 5).map((n: any) => ({
+            id: n._id.toString(),
+            title: n.title,
+            body: n.body,
+            link: n.link,
+            read: n.read,
+            type: n.type,
+            createdAt: new Date(n.createdAt).toLocaleDateString(),
+        }));
+        const pendingReqs = (pendingRequests as any[]).slice(0, 5).map((r: any) => ({
+            requestId: r._id.toString(),
+            username: r.fromUserId?.username ?? 'Unknown',
+        }));
+        res.render('home', {
+            title: 'Home',
+            script: 'home',
+            loggedIn: true,
+            username: user.username,
+            friendsCount: (user.friends ?? []).length,
+            pendingCount: pendingRequests.length,
+            unreadCount,
+            messagesSent,
+            memberSince: user.createdAt.toLocaleDateString(),
+            recentNotifs,
+            pendingReqs,
+            hasNotifs: recentNotifs.length > 0,
+            hasPending: pendingReqs.length > 0,
+            hasManyPending: pendingReqs.length > 5,
+        });
+    } catch (error) {
+        console.error('Error loading dashboard:', error);
+        res.render('home', { title: 'Home', script: 'home', loggedIn: false });
+    }
 });
 
 app.get('/profile', requireAuth, async (req: Request, res: Response) => {

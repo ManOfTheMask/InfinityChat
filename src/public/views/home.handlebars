@@ -1,3 +1,137 @@
+{{#if loggedIn}}
+{{!-- ── Logged-in dashboard ──────────────────────────────────────────────── --}}
+<div class="flex-1 w-full max-w-5xl mx-auto px-3 py-4 sm:px-6 sm:py-6">
+
+    {{!-- Greeting --}}
+    <div class="mb-4">
+        <h1 class="text-2xl sm:text-3xl font-bold text-base-content leading-tight">Welcome back, <span class="text-primary">{{username}}</span></h1>
+        <p class="text-base-content/50 text-xs mt-0.5">Member since {{memberSince}}</p>
+    </div>
+
+    {{!-- Two-column layout on lg+: stats left, content right --}}
+    <div class="flex flex-col lg:flex-row gap-4">
+
+        {{!-- Stats column (left on lg, top row on mobile) --}}
+        <div class="flex flex-row lg:flex-col gap-2 lg:w-40 shrink-0">
+            <div class="bg-base-200 rounded-xl shadow px-3 py-2.5 flex-1 lg:flex-none">
+                <p class="text-xs text-base-content/50 leading-tight">Friends</p>
+                <p class="text-xl font-bold text-primary leading-tight">{{friendsCount}}</p>
+            </div>
+            <div class="bg-base-200 rounded-xl shadow px-3 py-2.5 flex-1 lg:flex-none">
+                <p class="text-xs text-base-content/50 leading-tight">Msgs Sent</p>
+                <p class="text-xl font-bold text-secondary leading-tight">{{messagesSent}}</p>
+            </div>
+            <div class="bg-base-200 rounded-xl shadow px-3 py-2.5 flex-1 lg:flex-none">
+                <p class="text-xs text-base-content/50 leading-tight">Unread</p>
+                <p class="text-xl font-bold text-warning leading-tight">{{unreadCount}}</p>
+            </div>
+            <div class="bg-base-200 rounded-xl shadow px-3 py-2.5 flex-1 lg:flex-none">
+                <p class="text-xs text-base-content/50 leading-tight">Requests</p>
+                <p class="text-xl font-bold {{#if pendingCount}}text-error{{else}}text-accent{{/if}} leading-tight">{{pendingCount}}</p>
+            </div>
+        </div>
+
+        {{!-- Main content --}}
+        <div class="flex-1 min-w-0">
+
+    {{!-- Main grid --}}
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+        {{!-- Quick actions --}}
+        <div class="bg-base-200 rounded-xl shadow p-4">
+            <h2 class="text-base-content font-semibold text-xs uppercase tracking-wider mb-3 opacity-60">Quick Actions</h2>
+            <div class="grid grid-cols-2 gap-2">
+                <a href="/chat" class="btn btn-primary btn-sm w-full">Chat</a>
+                <button id="add-friend-btn" class="btn btn-secondary btn-sm w-full">Add Friend</button>
+                <a href="/friends" class="btn btn-outline btn-sm w-full">Friends</a>
+                <a href="/profile" class="btn btn-outline btn-sm w-full">Profile</a>
+            </div>
+        </div>
+
+        {{!-- Pending friend requests --}}
+        <div class="bg-base-200 rounded-xl shadow p-4">
+            <h2 class="text-base-content font-semibold text-xs uppercase tracking-wider mb-3 opacity-60">Pending Requests</h2>
+            {{#if hasPending}}
+                <ul class="flex flex-col gap-1.5 max-h-48 overflow-y-auto" id="pending-list">
+                    {{#each pendingReqs}}
+                    <li class="flex items-center justify-between bg-base-100 rounded-lg px-2.5 py-1.5 gap-2" data-request-id="{{requestId}}">
+                        <div class="flex items-center gap-2 min-w-0">
+                            <div class="avatar placeholder shrink-0">
+                                <div class="bg-neutral text-neutral-content rounded-full w-7">
+                                    <span class="text-xs font-bold">{{username.[0]}}</span>
+                                </div>
+                            </div>
+                            <span class="text-sm font-medium text-base-content truncate">{{username}}</span>
+                        </div>
+                        <div class="flex gap-1 shrink-0">
+                            <button class="btn btn-xs btn-success accept-btn" data-id="{{requestId}}">Accept</button>
+                            <button class="btn btn-xs btn-ghost text-error decline-btn" data-id="{{requestId}}">Decline</button>
+                        </div>
+                    </li>
+                    {{/each}}
+                </ul>
+                {{#if hasManyPending}}
+                <a href="/friends" class="btn btn-ghost btn-xs mt-2 w-full">View all {{pendingCount}} requests →</a>
+                {{/if}}
+            {{else}}
+                <p class="text-sm text-base-content/30 py-5 text-center">No pending requests</p>
+            {{/if}}
+        </div>
+
+        {{!-- Recent notifications --}}
+        <div class="bg-base-200 rounded-xl shadow p-4 md:col-span-2">
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="text-base-content font-semibold text-xs uppercase tracking-wider opacity-60">Recent Notifications</h2>
+                {{#if hasNotifs}}
+                <button id="mark-all-read-btn" class="btn btn-ghost btn-xs text-xs">Mark all read</button>
+                {{/if}}
+            </div>
+            {{#if hasNotifs}}
+                <ul class="flex flex-col gap-1.5 max-h-56 overflow-y-auto" id="notif-list">
+                    {{#each recentNotifs}}
+                    <li class="flex items-center gap-2.5 bg-base-100 rounded-lg px-2.5 py-2 {{#unless read}}border-l-2 border-primary{{/unless}}" data-notif-id="{{id}}">
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm font-medium text-base-content truncate leading-tight">{{title}}</p>
+                            {{#if body}}<p class="text-xs text-base-content/50 truncate">{{body}}</p>{{/if}}
+                        </div>
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            <span class="text-xs text-base-content/30 hidden sm:inline">{{createdAt}}</span>
+                            {{#if link}}
+                            <a href="{{link}}" class="btn btn-xs btn-ghost text-xs">View</a>
+                            {{/if}}
+                        </div>
+                    </li>
+                    {{/each}}
+                </ul>
+            {{else}}
+                <p class="text-sm text-base-content/30 py-5 text-center">All caught up</p>
+            {{/if}}
+        </div>
+
+        </div>
+        </div>{{!-- end main content --}}
+    </div>{{!-- end two-column layout --}}
+</div>
+
+{{!-- Add-friend modal --}}
+<dialog id="add-friend-modal" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box w-full max-w-lg">
+        <h3 class="font-bold text-lg mb-3">Add Friend</h3>
+        <p class="text-sm text-base-content/60 mb-3">Paste their PGP public key to send a friend request.</p>
+        <textarea id="add-friend-key" rows="5"
+            class="textarea textarea-bordered w-full font-mono text-xs"
+            placeholder="-----BEGIN PGP PUBLIC KEY BLOCK-----"></textarea>
+        <div class="modal-action mt-3">
+            <button id="send-request-btn" class="btn btn-primary btn-sm">Send Request</button>
+            <form method="dialog"><button class="btn btn-ghost btn-sm">Cancel</button></form>
+        </div>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
+
+{{else}}
+{{!-- ── Logged-out landing page ──────────────────────────────────────────── --}}
 <div class="flex flex-col items-center justify-center flex-1 px-4 py-10">
     <div class="bg-base-200 shadow-xl p-6 sm:p-10 rounded-2xl text-center w-full max-w-2xl">
         <img src="/img/LogoFull.png" alt="KeepQuiet" class="mx-auto block max-w-full max-h-48 sm:max-h-60 object-contain mb-6" />
@@ -8,5 +142,5 @@
         </div>
     </div>
 </div>
-    <!-- The compiled JavaScript will be served from /js/index.js -->
-    <script type="module" src="../js/home.js"></script>
+{{/if}}
+
