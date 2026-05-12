@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     {{#if currentUserId}}<meta name="current-user-id" content="{{currentUserId}}">{{/if}}
+    <script>(function(){var t=localStorage.getItem('kq-theme');if(t)document.documentElement.setAttribute('data-theme',t);}());</script>
     <link rel="stylesheet" href="/css/output.css">
     <title>{{title}}</title>
 </head>
@@ -40,6 +41,42 @@
                     </li>
                     {{/if}}
                     <li>
+                        <select id="themeSelect" class="select select-sm theme-controller" onchange="localStorage.setItem('kq-theme',this.value);location.reload()" aria-label="Select theme">
+                            <option value="light">Light</option>
+                            <option value="dark">Dark</option>
+                            <option value="cupcake">Cupcake</option>
+                            <option value="bumblebee">Bumblebee</option>
+                            <option value="emerald">Emerald</option>
+                            <option value="corporate">Corporate</option>
+                            <option value="synthwave">Synthwave</option>
+                            <option value="retro">Retro</option>
+                            <option value="cyberpunk">Cyberpunk</option>
+                            <option value="valentine">Valentine</option>
+                            <option value="halloween">Halloween</option>
+                            <option value="garden">Garden</option>
+                            <option value="forest">Forest</option>
+                            <option value="aqua">Aqua</option>
+                            <option value="lofi">Lofi</option>
+                            <option value="pastel">Pastel</option>
+                            <option value="fantasy">Fantasy</option>
+                            <option value="wireframe">Wireframe</option>
+                            <option value="black">Black</option>
+                            <option value="luxury">Luxury</option>
+                            <option value="dracula">Dracula</option>
+                            <option value="cmyk">CMYK</option>
+                            <option value="autumn">Autumn</option>
+                            <option value="business">Business</option>
+                            <option value="acid">Acid</option>
+                            <option value="lemonade">Lemonade</option>
+                            <option value="night">Night</option>
+                            <option value="coffee">Coffee</option>
+                            <option value="winter">Winter</option>
+                            <option value="dim">Dim</option>
+                            <option value="nord">Nord</option>
+                            <option value="sunset">Sunset</option>
+                        </select>
+                    </li>
+                    <li>
                         <details>
                             <summary class="font-medium">Menu</summary>
                             <ul class="bg-base-100 rounded-box shadow-lg p-2 z-[100] right-0 min-w-48">
@@ -64,6 +101,7 @@
         <p class="text-center text-sm text-base-content/60">KeepQuiet made by V01D &mdash; <a href="https://github.com/ManOfTheMask/KeepQuiet" class="link link-hover" target="_blank" rel="noopener noreferrer">GitHub</a></p>
     </footer>
     {{!-- Only load the page-specific JS, not PGPUtils.js directly --}}
+    <script>(function(){var s=document.getElementById('themeSelect');if(s)s.value=localStorage.getItem('kq-theme')||'dark';}());</script>
     {{#if script}}
       <script type="module" src="/js/{{script}}.js"></script>
     {{/if}}

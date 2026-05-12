@@ -1,5 +1,7 @@
 @import "tailwindcss";
-@plugin "daisyui";
+@plugin "daisyui" {
+  themes: all;
+}
 
 /* Mobile sidebar for chat page.
    --navbar-height matches DaisyUI's navbar min-block-size (4rem). */
