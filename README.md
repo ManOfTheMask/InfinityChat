@@ -19,6 +19,8 @@ KeepQuiet is a self-hostable, end-to-end encrypted messaging application. All en
 - **Friends system** — send, accept, and decline friend requests by sharing your public key
 - **Conversation management** — pin conversations, close a DM (with the option to delete all messages), and re-open it later by messaging the same friend again
 - **Message deletion** — soft-delete individual messages; deleted messages show a placeholder to all participants
+- **Dashboard** — logged-in users see a summary of stats (friend count, messages sent, unread notifications, pending requests), quick-action buttons, and an inline accept/decline panel for incoming friend requests
+- **Profile page** — displays your username, member-since date, and your full ASCII-armored PGP public key with a one-click copy-to-clipboard button
 
 ---
 
@@ -28,9 +30,10 @@ KeepQuiet is a self-hostable, end-to-end encrypted messaging application. All en
 KeepQuiet uses a **PGP challenge-response** flow instead of passwords:
 
 1. On signup, the browser generates a PGP key pair. The private key is downloaded to your device and never leaves it. The public key is registered with the server.
-2. On login, you upload your private key file and enter your passphrase. The client extracts the public key, requests an encrypted challenge from the server, decrypts it locally, and returns the solution to prove ownership of the private key.
-3. Once authenticated, a session is established server-side.
-4. If PGP credentials are not already in `sessionStorage`, an unlock overlay prompts you to re-enter them so messages can be decrypted without logging out.
+2. On login, you upload your private key file and enter your passphrase. The client extracts the public key, sends it to `GET /login/challenge` to receive a server-generated random challenge encrypted with that public key.
+3. The client decrypts the challenge locally and sends the plaintext answer to `POST /login/verify`. A successful match establishes an authenticated server-side session (1-hour cookie).
+4. Challenges expire after 5 minutes and are deleted from memory after use, preventing replay attacks.
+5. If PGP credentials are not already in `sessionStorage`, an unlock overlay prompts you to re-enter them so messages can be decrypted without logging out.
 
 ### Messaging
 - Conversations are 1-to-1 DMs between friends.
@@ -49,6 +52,19 @@ KeepQuiet uses a **PGP challenge-response** flow instead of passwords:
 - Notifications are pushed in real time via WebSocket when a friend request is received or a new message arrives.
 - Each notification has a **Mark read** button and a **Dismiss** button (permanently deletes the notification).
 - **Mark all read** clears the badge in one click.
+
+### Real-time (WebSockets)
+All real-time communication goes through a single WebSocket endpoint at `/ws`. The server authenticates the connection by reading and verifying the session cookie on the initial HTTP upgrade request.
+
+| Direction | Event type | Payload |
+|---|---|---|
+| Server → Client | `new_message` | `{ conversationId, message: { id, senderUsername, senderId, content, deleted, createdAt } }` |
+| Server → Client | `new_notification` | `{ notification: { id, type, title, body, link, read, createdAt } }` |
+| Server → Client | `message_deleted` | `{ conversationId, messageId }` |
+| Server → Client | `__ping__` | keepalive ping (string literal) |
+| Client → Server | `__pong__` | keepalive response (string literal) |
+
+Connections that miss two consecutive pings are terminated automatically.
 
 ---
 
@@ -120,10 +136,18 @@ KeepQuiet uses a **PGP challenge-response** flow instead of passwords:
 
 ## API Routes
 
+### Pages
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/` | Home / dashboard (stats + quick actions when logged in) |
+| `GET` | `/profile` | Profile page (username, member since, armored public key) |
+
 ### Auth / User
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/login` | Login page |
+| `GET` | `/login/challenge` | Request a PGP-encrypted challenge for the given public key |
+| `POST` | `/login/verify` | Submit the decrypted challenge to complete authentication |
 | `GET` | `/signup` | Sign-up landing |
 | `GET` | `/signup/generate` | Generate a new PGP key pair |
 | `GET` | `/signup/import` | Import an existing PGP key |
