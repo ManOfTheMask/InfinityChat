@@ -16,7 +16,7 @@ KeepQuiet is a self-hostable, end-to-end encrypted messaging application. All en
 - **PGP challenge-response login** — no passwords; authentication is proven by decrypting a server challenge with your private key
 - **Real-time messaging** — WebSocket delivery so messages appear instantly without refreshing
 - **Real-time notifications** — in-app notification bell for new messages and friend requests, pushed via WebSocket
-- **Friends system** — send, accept, and decline friend requests by sharing your public key
+- **Friends system** — send, accept, and decline friend requests by sharing your public key; remove friends and permanently delete your conversation with them in one action
 - **Conversation management** — pin conversations, close a DM (with the option to delete all messages), and re-open it later by messaging the same friend again
 - **Message deletion** — soft-delete individual messages; deleted messages show a placeholder to all participants
 - **Dashboard** — logged-in users see a summary of stats (friend count, messages sent, unread notifications, pending requests), quick-action buttons, and an inline accept/decline panel for incoming friend requests
@@ -44,7 +44,8 @@ KeepQuiet uses a **PGP challenge-response** flow instead of passwords:
 
 ### Friends
 - Users find each other by sharing their PGP public key.
-- Friend requests can be sent, accepted, or declined from the Friends page.
+- Friend requests can be sent, accepted, or declined from the Friends page. Accepting or declining a request permanently deletes it from the database.
+- Friends can be removed at any time from the Friends page. Removing a friend also permanently deletes the shared conversation and all its messages.
 - The friends list is used in the chat friend picker to start new conversations.
 
 ### Notifications
@@ -118,7 +119,7 @@ Connections that miss two consecutive pings are terminated automatically.
 |---|---|---|
 | `fromUserId` | ObjectId | references User |
 | `toUserId` | ObjectId | references User |
-| `status` | enum | `pending`, `accepted`, `declined` |
+| `status` | enum | `pending` only — records are deleted when accepted or declined |
 | `createdAt` | datetime | |
 
 ### Notification
@@ -159,8 +160,9 @@ Connections that miss two consecutive pings are terminated automatically.
 | Method | Path | Description |
 |---|---|---|
 | `POST` | `/friends/request` | Send a friend request (by public key) |
-| `POST` | `/friends/accept/:requestId` | Accept a friend request |
-| `POST` | `/friends/decline/:requestId` | Decline a friend request |
+| `POST` | `/friends/accept/:requestId` | Accept a friend request (deletes the request record) |
+| `POST` | `/friends/decline/:requestId` | Decline a friend request (deletes the request record) |
+| `POST` | `/friends/remove/:friendId` | Remove a friend and permanently delete the shared conversation and all messages |
 | `GET` | `/friends/list` | JSON list of friends (used by friend picker) |
 
 ### Chat
