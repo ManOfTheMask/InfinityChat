@@ -18,8 +18,37 @@
             </div>
             <pre class="bg-base-300 text-base-content text-xs font-mono p-4 text-left whitespace-pre-wrap break-all max-h-64 overflow-y-auto" id="public-key-text">{{publicKey}}</pre>
         </div>
+
+        <div class="mt-8 pt-6 border-t border-error/30 w-full flex flex-col items-center gap-2">
+            <p class="text-xs text-base-content/50 text-center">Danger zone</p>
+            <button id="deleteAccountBtn" class="btn btn-error btn-outline btn-sm">🗑 Delete Account</button>
+        </div>
     </div>
 </div>
+
+<!-- Delete account modal -->
+<dialog id="deleteAccountModal" class="modal">
+    <div class="modal-box flex flex-col gap-4 max-w-sm w-full">
+        <h3 class="font-bold text-lg text-error">Delete Account</h3>
+        <p class="text-sm text-base-content/70">
+            This will permanently delete your account and all associated data — messages, conversations, friend connections, and notifications. <strong>This cannot be undone.</strong>
+        </p>
+        <div class="form-control gap-1">
+            <label class="label"><span class="label-text text-sm">Private Key File</span></label>
+            <input id="deleteKeyFile" type="file" accept=".asc,.gpg,.key,text/plain" class="file-input file-input-bordered file-input-error w-full" />
+        </div>
+        <div class="form-control gap-1">
+            <label class="label"><span class="label-text text-sm">Passphrase</span></label>
+            <input id="deletePassphrase" type="password" placeholder="Your PGP passphrase" class="input input-bordered input-error w-full" />
+        </div>
+        <p id="deleteAccountError" class="text-error text-sm hidden"></p>
+        <div class="modal-action flex gap-2 mt-0">
+            <button id="deleteAccountConfirmBtn" class="btn btn-error flex-1">Delete My Account</button>
+            <button id="deleteAccountCancelBtn" class="btn btn-ghost flex-1">Cancel</button>
+        </div>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
 
 <!-- Profile picture crop modal -->
 <dialog id="avatarModal" class="modal">

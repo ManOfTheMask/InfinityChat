@@ -1,0 +1,294 @@
+import mongoose from "mongoose";
+import GroupConversationModel from "../Models/GroupConversationModel";
+import GroupMessageModel from "../Models/GroupMessageModel";
+import UserModel from "../Models/UserModel";
+
+class GroupController {
+    /**
+     * Create a new group conversation.
+     * adminId is always included as a member.
+     * memberUserIds is the additional member ids (up to 9 more, total max 10).
+     */
+    async createGroup(adminId: string, name: string | null, memberUserIds: string[]) {
+        const allIds = Array.from(new Set([adminId, ...memberUserIds]));
+        if (allIds.length > 10) throw new Error("Group chats are limited to 10 members.");
+        if (allIds.length < 2)  throw new Error("A group requires at least 2 members.");
+
+        // Fetch all users to build the key ring
+        const users = await UserModel.find({ _id: { $in: allIds.map(id => new mongoose.Types.ObjectId(id)) } });
+        if (users.length !== allIds.length) throw new Error("One or more users not found.");
+
+        const members = users.map(u => ({
+            userId: u._id,
+            publicKeyArmored: (u as any).publicKeyArmored ?? null,
+        }));
+
+        // Every member must have an armored public key for encryption to work
+        const missing = members.filter(m => !m.publicKeyArmored).map(m => m.userId.toString());
+        if (missing.length > 0) throw new Error(`Some members have no PGP key stored: ${missing.join(", ")}`);
+
+        return await GroupConversationModel.create({
+            name: name?.trim() || null,
+            adminId: new mongoose.Types.ObjectId(adminId),
+            members,
+        });
+    }
+
+    /** Return all groups the user is a member of, most recently active first. */
+    async getGroupsForUser(userId: string) {
+        const uid = new mongoose.Types.ObjectId(userId);
+
+        return await GroupConversationModel.find({ "members.userId": uid })
+            .populate('members.userId', 'username')
+            .sort({ lastMessageAt: -1 })
+            .lean();
+    }
+
+    /** Get group info (name, admin, member list) — must be a member. */
+    async getGroupInfo(groupId: string, userId: string) {
+        const gid = new mongoose.Types.ObjectId(groupId);
+        const uid = new mongoose.Types.ObjectId(userId);
+
+        const group = await GroupConversationModel.findById(gid)
+            .populate("members.userId", "username profilePicture")
+            .populate("adminId", "username")
+            .lean();
+
+        if (!group) throw new Error("Group not found.");
+        const isMember = (group.members as any[]).some((m: any) => m.userId._id.equals(uid));
+        if (!isMember) throw new Error("Unauthorized.");
+
+        return group;
+    }
+
+    /** Return the key ring (array of armoredPublicKeys) for a group — must be a member. */
+    async getKeyring(groupId: string, userId: string) {
+        const gid = new mongoose.Types.ObjectId(groupId);
+        const uid = new mongoose.Types.ObjectId(userId);
+
+        const group = await GroupConversationModel.findById(gid).lean();
+        if (!group) throw new Error("Group not found.");
+
+        const isMember = (group.members as any[]).some((m: any) => m.userId.equals(uid));
+        if (!isMember) throw new Error("Unauthorized.");
+
+        return (group.members as any[]).map((m: any) => m.publicKeyArmored as string);
+    }
+
+    /** Get messages for a group — must be a member. */
+    async getMessages(groupId: string, userId: string) {
+        const gid = new mongoose.Types.ObjectId(groupId);
+        const uid = new mongoose.Types.ObjectId(userId);
+
+        const group = await GroupConversationModel.findById(gid).lean();
+        if (!group) throw new Error("Group not found.");
+
+        const isMember = (group.members as any[]).some((m: any) => m.userId.equals(uid));
+        if (!isMember) throw new Error("Unauthorized.");
+
+        return await GroupMessageModel.find({ groupId: gid })
+            .populate("senderId", "username")
+            .sort({ createdAt: 1 })
+            .lean();
+    }
+
+    /** Send a message to a group — must be a member. */
+    async sendMessage(groupId: string, senderId: string, content: string) {
+        if (!content?.trim()) throw new Error("Message content cannot be empty.");
+
+        const gid = new mongoose.Types.ObjectId(groupId);
+        const sid = new mongoose.Types.ObjectId(senderId);
+
+        const group = await GroupConversationModel.findById(gid);
+        if (!group) throw new Error("Group not found.");
+
+        const isMember = (group.members as any[]).some((m: any) => m.userId.equals(sid));
+        if (!isMember) throw new Error("Unauthorized.");
+
+        const message = await GroupMessageModel.create({
+            groupId: gid,
+            senderId: sid,
+            content: content.trim(),
+        });
+
+        group.lastMessageAt = new Date();
+        await group.save();
+
+        return message;
+    }
+
+    /** Soft-delete a message — sender only. */
+    async deleteMessage(messageId: string, userId: string) {
+        const msg = await GroupMessageModel.findById(messageId);
+        if (!msg) throw new Error("Message not found.");
+        if (!msg.senderId.equals(new mongoose.Types.ObjectId(userId))) {
+            throw new Error("Unauthorized.");
+        }
+        msg.deletedAt = new Date();
+        await msg.save();
+        return msg;
+    }
+
+    /**
+     * Invite / add a member to a group.
+     * Any current member can invite. The target must have an armored public key.
+     */
+    async inviteMember(groupId: string, inviterId: string, targetUserId: string) {
+        const gid = new mongoose.Types.ObjectId(groupId);
+        const iid = new mongoose.Types.ObjectId(inviterId);
+        const tid = new mongoose.Types.ObjectId(targetUserId);
+
+        const group = await GroupConversationModel.findById(gid);
+        if (!group) throw new Error("Group not found.");
+
+        const isInviterMember = (group.members as any[]).some((m: any) => m.userId.equals(iid));
+        if (!isInviterMember) throw new Error("Only group members can invite others.");
+
+        if ((group.members as any[]).some((m: any) => m.userId.equals(tid))) {
+            throw new Error("User is already a member of this group.");
+        }
+
+        if (group.members.length >= 10) throw new Error("Group is full (10 members max).");
+
+        const target = await UserModel.findById(tid);
+        if (!target) throw new Error("User not found.");
+        if (!(target as any).publicKeyArmored) {
+            throw new Error("That user has no PGP key stored and cannot join encrypted groups.");
+        }
+
+        await GroupConversationModel.findByIdAndUpdate(gid, {
+            $push: { members: { userId: tid, publicKeyArmored: (target as any).publicKeyArmored } },
+        });
+
+        return target;
+    }
+
+    /**
+     * Kick a member — admin only.
+     * Deletes all messages sent by that member and removes their key from the ring.
+     */
+    async removeMember(groupId: string, requesterId: string, targetUserId: string) {
+        const gid = new mongoose.Types.ObjectId(groupId);
+        const rid = new mongoose.Types.ObjectId(requesterId);
+        const tid = new mongoose.Types.ObjectId(targetUserId);
+
+        const group = await GroupConversationModel.findById(gid);
+        if (!group) throw new Error("Group not found.");
+
+        if (!(group.adminId as any).equals(rid)) {
+            throw new Error("Only the group admin can remove members.");
+        }
+
+        if (tid.equals(rid)) throw new Error("Admin cannot remove themselves — use leave instead.");
+
+        // Soft-delete all messages by this member
+        await GroupMessageModel.updateMany(
+            { groupId: gid, senderId: tid, deletedAt: null },
+            { $set: { deletedAt: new Date() } },
+        );
+
+        // Remove from members array (and key ring)
+        await GroupConversationModel.findByIdAndUpdate(gid, {
+            $pull: { members: { userId: tid } },
+        });
+    }
+
+    /**
+     * Leave a group voluntarily.
+     * Deletes all messages by this user and removes their key from the ring.
+     * If the admin leaves and others remain, promote the earliest-joined member.
+     */
+    async leaveGroup(groupId: string, userId: string) {
+        const gid = new mongoose.Types.ObjectId(groupId);
+        const uid = new mongoose.Types.ObjectId(userId);
+
+        const group = await GroupConversationModel.findById(gid);
+        if (!group) throw new Error("Group not found.");
+
+        const isMember = (group.members as any[]).some((m: any) => m.userId.equals(uid));
+        if (!isMember) throw new Error("You are not a member of this group.");
+
+        // Soft-delete all messages by this user
+        await GroupMessageModel.updateMany(
+            { groupId: gid, senderId: uid, deletedAt: null },
+            { $set: { deletedAt: new Date() } },
+        );
+
+        // Remove member and their key
+        const remainingMembers = (group.members as any[]).filter((m: any) => !m.userId.equals(uid));
+
+        if (remainingMembers.length === 0) {
+            // Last person leaving — delete the group
+            await GroupConversationModel.findByIdAndDelete(gid);
+            await GroupMessageModel.deleteMany({ groupId: gid });
+            return;
+        }
+
+        const update: any = { $pull: { members: { userId: uid } } };
+
+        // Promote first remaining member if admin is leaving
+        if ((group.adminId as any).equals(uid)) {
+            update.$set = { adminId: remainingMembers[0].userId };
+        }
+
+        await GroupConversationModel.findByIdAndUpdate(gid, update);
+    }
+
+    /**
+     * Delete a group entirely — admin only.
+     * Hard-deletes all messages and the group document.
+     */
+    async deleteGroup(groupId: string, userId: string) {
+        const gid = new mongoose.Types.ObjectId(groupId);
+        const uid = new mongoose.Types.ObjectId(userId);
+
+        const group = await GroupConversationModel.findById(gid);
+        if (!group) throw new Error("Group not found.");
+        if (!(group.adminId as any).equals(uid)) throw new Error("Only the group admin can delete the group.");
+
+        await GroupMessageModel.deleteMany({ groupId: gid });
+        await GroupConversationModel.findByIdAndDelete(gid);
+    }
+
+    /**
+     * Rename a group — any member can do this.
+     * Pass null or empty string to clear the name (falls back to member list display).
+     */
+    async renameGroup(groupId: string, userId: string, name: string | null) {
+        const gid = new mongoose.Types.ObjectId(groupId);
+        const uid = new mongoose.Types.ObjectId(userId);
+
+        const group = await GroupConversationModel.findById(gid);
+        if (!group) throw new Error("Group not found.");
+
+        const isMember = (group.members as any[]).some((m: any) => m.userId.equals(uid));
+        if (!isMember) throw new Error("Unauthorized.");
+
+        const trimmed = name?.trim() || null;
+        await GroupConversationModel.findByIdAndUpdate(gid, { $set: { name: trimmed } });
+        return { name: trimmed };
+    }
+
+    /** Toggle pin for a user on a group. */
+    async togglePin(groupId: string, userId: string) {
+        const gid = new mongoose.Types.ObjectId(groupId);
+        const uid = new mongoose.Types.ObjectId(userId);
+
+        const group = await GroupConversationModel.findById(gid);
+        if (!group) throw new Error("Group not found.");
+
+        const isMember = (group.members as any[]).some((m: any) => m.userId.equals(uid));
+        if (!isMember) throw new Error("Unauthorized.");
+
+        const isPinned = (group.pinnedBy as any[]).some((p: any) => p.equals(uid));
+        if (isPinned) {
+            await GroupConversationModel.findByIdAndUpdate(gid, { $pull: { pinnedBy: uid } });
+            return { pinned: false };
+        } else {
+            await GroupConversationModel.findByIdAndUpdate(gid, { $addToSet: { pinnedBy: uid } });
+            return { pinned: true };
+        }
+    }
+}
+
+export default new GroupController();

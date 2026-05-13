@@ -10,8 +10,14 @@ import UserController from './Controllers/UserController';
 import FriendController from './Controllers/FriendController';
 import ChatController from './Controllers/ChatController';
 import NotificationController from './Controllers/NotificationController';
+import GroupController from './Controllers/GroupController';
 import ConversationModel from './Models/ConversationModel';
 import MessageModel from './Models/MessageModel';
+import GroupConversationModel from './Models/GroupConversationModel';
+import GroupMessageModel from './Models/GroupMessageModel';
+import FriendRequestModel from './Models/FriendRequestModel';
+import NotificationModel from './Models/NotificationModel';
+import UserModel from './Models/UserModel';
 import dotenv from 'dotenv';
 import session from 'express-session';
 import openpgp from 'openpgp'; // Import OpenPGP for cryptographic operations
@@ -177,7 +183,7 @@ app.get('/', async (req: Request, res: Response) => {
             res.render('home', { title: 'Home', script: 'home', loggedIn: false });
             return;
         }
-        const recentNotifs = notifications.slice(0, 5).map((n: any) => ({
+        const recentNotifs = notifications.filter((n: any) => !n.read).slice(0, 5).map((n: any) => ({
             id: n._id.toString(),
             title: n.title,
             body: n.body,
@@ -259,6 +265,96 @@ app.post('/profile/avatar', requireAuth, async (req: Request, res: Response) => 
     }
 });
 
+// Delete account — verifies the user's PGP private key + passphrase then wipes all data
+app.delete('/profile/account', requireAuth, async (req: Request, res: Response) => {
+    const { privateKeyArmored, passphrase } = req.body;
+    if (!privateKeyArmored || typeof privateKeyArmored !== 'string' ||
+        !passphrase        || typeof passphrase        !== 'string') {
+        res.status(400).json({ success: false, message: 'Private key and passphrase are required.' });
+        return;
+    }
+
+    const userId = req.session.userId!;
+    try {
+        const user = await UserController.getUserById(userId);
+        if (!user) {
+            res.status(404).json({ success: false, message: 'User not found.' });
+            return;
+        }
+
+        // Verify the supplied private key decrypts with the passphrase and matches the stored public key
+        let privateKey: openpgp.PrivateKey;
+        try {
+            const encryptedKey = await openpgp.readPrivateKey({ armoredKey: privateKeyArmored });
+            privateKey = await openpgp.decryptKey({ privateKey: encryptedKey, passphrase });
+        } catch {
+            res.status(401).json({ success: false, message: 'Invalid private key or passphrase.' });
+            return;
+        }
+
+        const storedPublicKeyArmored = (user as any).publicKeyArmored;
+        if (storedPublicKeyArmored) {
+            try {
+                const storedPublicKey = await openpgp.readKey({ armoredKey: storedPublicKeyArmored });
+                const suppliedFingerprint = privateKey.toPublic().getFingerprint();
+                const storedFingerprint   = storedPublicKey.getFingerprint();
+                if (suppliedFingerprint !== storedFingerprint) {
+                    res.status(401).json({ success: false, message: 'Private key does not match this account.' });
+                    return;
+                }
+            } catch {
+                res.status(500).json({ success: false, message: 'Failed to verify key identity.' });
+                return;
+            }
+        }
+
+        const uid = new mongoose.Types.ObjectId(userId);
+
+        // Remove user from all friends lists
+        await UserModel.updateMany({ friends: uid }, { $pull: { friends: uid } });
+
+        // Delete all friend requests involving this user
+        await FriendRequestModel.deleteMany({ $or: [{ fromUserId: uid }, { toUserId: uid }] });
+
+        // Delete all notifications for this user
+        await NotificationModel.deleteMany({ userId: uid });
+
+        // Delete all DM messages sent by this user and conversations they participate in
+        await MessageModel.deleteMany({ senderId: uid });
+        await ConversationModel.deleteMany({ participants: uid });
+
+        // Handle group memberships
+        const groups = await GroupConversationModel.find({ 'members.userId': uid });
+        for (const group of groups) {
+            const remainingMembers = (group.members as any[]).filter((m: any) => !m.userId.equals(uid));
+            await GroupMessageModel.updateMany(
+                { groupId: group._id, senderId: uid, deletedAt: null },
+                { $set: { deletedAt: new Date() } },
+            );
+            if (remainingMembers.length === 0) {
+                await GroupMessageModel.deleteMany({ groupId: group._id });
+                await GroupConversationModel.findByIdAndDelete(group._id);
+            } else {
+                const update: any = { $pull: { members: { userId: uid } } };
+                if ((group.adminId as any).equals(uid)) {
+                    update.$set = { adminId: remainingMembers[0].userId };
+                }
+                await GroupConversationModel.findByIdAndUpdate(group._id, update);
+            }
+        }
+
+        // Delete the user document
+        await UserController.deleteAccount(userId);
+
+        // Destroy the session
+        req.session.destroy(() => {});
+        res.json({ success: true });
+    } catch (error: any) {
+        console.error('Error deleting account:', error);
+        res.status(500).json({ success: false, message: 'Failed to delete account.' });
+    }
+});
+
 // Return a user's avatar by their id (used by the chat UI)
 app.get('/user/:userId/avatar', requireAuth, async (req: Request, res: Response) => {
     try {
@@ -268,6 +364,25 @@ app.get('/user/:userId/avatar', requireAuth, async (req: Request, res: Response)
             return;
         }
         res.json({ success: true, profilePicture: (user as any).profilePicture ?? null });
+    } catch (error: any) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// Search user by exact username (used by group invite)
+app.get('/user/search', requireAuth, async (req: Request, res: Response) => {
+    const username = typeof req.query.username === 'string' ? req.query.username.trim() : '';
+    if (!username) {
+        res.status(400).json({ success: false, message: 'username query param is required.' });
+        return;
+    }
+    try {
+        const user = await UserController.getUserByUsername(username);
+        if (!user) {
+            res.json({ success: false, message: 'User not found.' });
+            return;
+        }
+        res.json({ success: true, userId: (user as any)._id.toString(), username: user.username });
     } catch (error: any) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -381,16 +496,43 @@ app.get('/friends/list', requireAuth, async (req: Request, res: Response) => {
 app.get('/chat', requireAuth, async (req: Request, res: Response) => {
     try {
         const userId = req.session.userId!;
-        const conversations = await ChatController.getConversationsForUser(userId);
-        const serialized = conversations.map((c: any) => ({
+        const [conversations, groups] = await Promise.all([
+            ChatController.getConversationsForUser(userId),
+            GroupController.getGroupsForUser(userId),
+        ]);
+
+        const serializedDMs = conversations.map((c: any) => ({
             id: c._id.toString(),
+            type: 'dm',
             otherUsername: c.other?.username ?? 'Unknown',
-            lastMessageAt: c.lastMessageAt
-                ? new Date(c.lastMessageAt).toLocaleString()
-                : null,
+            lastMessageAt: c.lastMessageAt ? new Date(c.lastMessageAt).toLocaleString() : null,
             pinned: c.pinned,
         }));
-        res.render('chat', { title: 'Chat', script: 'chat', conversations: serialized, currentUserId: userId });
+
+        const serializedGroups = groups.map((g: any) => {
+            const memberList = g.members.map((m: any) => m.userId?.username ?? '').filter(Boolean).join(', ');
+            return {
+                id: g._id.toString(),
+                type: 'group',
+                otherUsername: g.name ?? memberList,
+                memberList,
+                lastMessageAt: g.lastMessageAt ? new Date(g.lastMessageAt).toLocaleString() : null,
+                pinned: (g.pinnedBy ?? []).some((p: any) => p.equals(new mongoose.Types.ObjectId(userId))),
+                adminId: g.adminId?.toString() ?? null,
+            };
+        });
+
+        // Merge and sort: pinned first, then by lastMessageAt
+        const allConvos = [...serializedDMs, ...serializedGroups].sort((a: any, b: any) => {
+            if (a.pinned && !b.pinned) return -1;
+            if (!a.pinned && b.pinned) return 1;
+            if (a.lastMessageAt && b.lastMessageAt) return new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime();
+            if (a.lastMessageAt) return -1;
+            if (b.lastMessageAt) return 1;
+            return 0;
+        });
+
+        res.render('chat', { title: 'Chat', script: 'chat', conversations: allConvos, currentUserId: userId });
     } catch (error) {
         console.error('Error loading chat page:', error);
         res.status(500).send('Internal server error.');
@@ -780,6 +922,252 @@ app.post('/login/verify', async (req: Request, res: Response) => {
     } catch (error) {
         console.error('Error verifying challenge:', error);
         res.status(500).json({ success: false, message: 'Internal server error.' });
+    }
+});
+
+// ── Group chat routes ─────────────────────────────────────────────────────────
+
+// Create a new group
+app.post('/group/create', requireAuth, async (req: Request, res: Response) => {
+    const { name, memberIds } = req.body;
+    if (!Array.isArray(memberIds) || memberIds.length < 1) {
+        res.status(400).json({ success: false, message: 'At least one other member is required.' });
+        return;
+    }
+    try {
+        const group = await GroupController.createGroup(req.session.userId!, name ?? null, memberIds);
+        res.json({ success: true, groupId: group._id.toString() });
+    } catch (err: any) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+// Get group info + member list
+app.get('/group/:groupId/info', requireAuth, async (req: Request, res: Response) => {
+    try {
+        const group = await GroupController.getGroupInfo(req.params.groupId, req.session.userId!);
+        res.json({ success: true, group });
+    } catch (err: any) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+// Get the key ring (all members' armored public keys)
+app.get('/group/:groupId/keyring', requireAuth, async (req: Request, res: Response) => {
+    try {
+        const keys = await GroupController.getKeyring(req.params.groupId, req.session.userId!);
+        res.json({ success: true, keys });
+    } catch (err: any) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+// Get messages
+app.get('/group/:groupId/messages', requireAuth, async (req: Request, res: Response) => {
+    try {
+        const messages = await GroupController.getMessages(req.params.groupId, req.session.userId!);
+        const serialized = messages.map((m: any) => ({
+            id: m._id.toString(),
+            senderUsername: m.senderId?.username ?? 'Unknown',
+            senderId: m.senderId?._id?.toString(),
+            content: m.deletedAt ? null : m.content,
+            deleted: !!m.deletedAt,
+            createdAt: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        }));
+        res.json({ success: true, messages: serialized });
+    } catch (err: any) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+// Send a message to a group
+app.post('/group/:groupId/messages', requireAuth, async (req: Request, res: Response) => {
+    const { content } = req.body;
+    if (!content) {
+        res.status(400).json({ success: false, message: 'content is required.' });
+        return;
+    }
+    try {
+        const message = await GroupController.sendMessage(req.params.groupId, req.session.userId!, content);
+        const sender = await UserController.getUserById(req.session.userId!);
+        const group = await GroupConversationModel.findById(req.params.groupId);
+
+        if (group && sender) {
+            const wsMsg = {
+                type: 'new_group_message',
+                groupId: req.params.groupId,
+                message: {
+                    id: message._id.toString(),
+                    senderUsername: sender.username,
+                    senderId: req.session.userId!,
+                    content,
+                    deleted: false,
+                    createdAt: new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                },
+            };
+            for (const m of group.members as any[]) {
+                broadcastToUser(m.userId.toString(), wsMsg);
+            }
+        }
+
+        res.json({ success: true, messageId: message._id.toString() });
+    } catch (err: any) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+// Soft-delete a group message
+app.delete('/group/:groupId/messages/:messageId', requireAuth, async (req: Request, res: Response) => {
+    try {
+        await GroupController.deleteMessage(req.params.messageId, req.session.userId!);
+        const group = await GroupConversationModel.findById(req.params.groupId);
+        if (group) {
+            const wsMsg = {
+                type: 'group_message_deleted',
+                groupId: req.params.groupId,
+                messageId: req.params.messageId,
+            };
+            for (const m of group.members as any[]) {
+                broadcastToUser(m.userId.toString(), wsMsg);
+            }
+        }
+        res.json({ success: true });
+    } catch (err: any) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+// Invite a member (any member can invite)
+app.post('/group/:groupId/invite', requireAuth, async (req: Request, res: Response) => {
+    const { targetUserId } = req.body;
+    if (!targetUserId) {
+        res.status(400).json({ success: false, message: 'targetUserId is required.' });
+        return;
+    }
+    try {
+        const newMember = await GroupController.inviteMember(req.params.groupId, req.session.userId!, targetUserId);
+        const group = await GroupConversationModel.findById(req.params.groupId).lean();
+        const inviter = await UserController.getUserById(req.session.userId!);
+
+        // Notify all current members (including the new one) of the addition
+        const wsMsg = {
+            type: 'group_member_added',
+            groupId: req.params.groupId,
+            member: { id: (newMember as any)._id.toString(), username: newMember.username },
+        };
+        if (group) {
+            for (const m of group.members as any[]) {
+                broadcastToUser(m.userId.toString(), wsMsg);
+            }
+        }
+        // Also notify the newly added user
+        broadcastToUser((newMember as any)._id.toString(), wsMsg);
+
+        // Send notification to the invited user
+        if (inviter) {
+            await NotificationController.create(
+                (newMember as any)._id.toString(),
+                'group_invite',
+                `Added to group chat`,
+                `${inviter.username} added you to a group chat.`,
+                `/chat`,
+            );
+        }
+
+        res.json({ success: true, member: { id: (newMember as any)._id.toString(), username: newMember.username } });
+    } catch (err: any) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+// Remove a member — admin only
+app.delete('/group/:groupId/members/:memberId', requireAuth, async (req: Request, res: Response) => {
+    try {
+        await GroupController.removeMember(req.params.groupId, req.session.userId!, req.params.memberId);
+        const group = await GroupConversationModel.findById(req.params.groupId).lean();
+        const wsMsg = {
+            type: 'group_member_removed',
+            groupId: req.params.groupId,
+            memberId: req.params.memberId,
+        };
+        if (group) {
+            for (const m of group.members as any[]) {
+                broadcastToUser(m.userId.toString(), wsMsg);
+            }
+        }
+        broadcastToUser(req.params.memberId, wsMsg);
+        res.json({ success: true });
+    } catch (err: any) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+// Leave a group
+app.post('/group/:groupId/leave', requireAuth, async (req: Request, res: Response) => {
+    try {
+        // Capture members before leave so we can broadcast to all of them
+        const groupBefore = await GroupConversationModel.findById(req.params.groupId).lean();
+        await GroupController.leaveGroup(req.params.groupId, req.session.userId!);
+
+        if (groupBefore) {
+            const wsMsg = {
+                type: 'group_member_removed',
+                groupId: req.params.groupId,
+                memberId: req.session.userId!,
+            };
+            for (const m of groupBefore.members as any[]) {
+                broadcastToUser(m.userId.toString(), wsMsg);
+            }
+        }
+        res.json({ success: true });
+    } catch (err: any) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+// Toggle pin for a group
+app.post('/group/:groupId/pin', requireAuth, async (req: Request, res: Response) => {
+    try {
+        const result = await GroupController.togglePin(req.params.groupId, req.session.userId!);
+        res.json({ success: true, ...result });
+    } catch (err: any) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+// Delete a group — admin only
+app.delete('/group/:groupId', requireAuth, async (req: Request, res: Response) => {
+    try {
+        const group = await GroupConversationModel.findById(req.params.groupId).lean();
+        await GroupController.deleteGroup(req.params.groupId, req.session.userId!);
+
+        if (group) {
+            const wsMsg = { type: 'group_deleted', groupId: req.params.groupId };
+            for (const m of group.members as any[]) {
+                broadcastToUser(m.userId.toString(), wsMsg);
+            }
+        }
+        res.json({ success: true });
+    } catch (err: any) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+// Rename a group — any member
+app.patch('/group/:groupId/name', requireAuth, async (req: Request, res: Response) => {
+    const { name } = req.body;
+    try {
+        const result = await GroupController.renameGroup(req.params.groupId, req.session.userId!, name ?? null);
+        const group = await GroupConversationModel.findById(req.params.groupId).lean();
+        if (group) {
+            const wsMsg = { type: 'group_renamed', groupId: req.params.groupId, name: result.name };
+            for (const m of group.members as any[]) {
+                broadcastToUser(m.userId.toString(), wsMsg);
+            }
+        }
+        res.json({ success: true, name: result.name });
+    } catch (err: any) {
+        res.status(400).json({ success: false, message: err.message });
     }
 });
 

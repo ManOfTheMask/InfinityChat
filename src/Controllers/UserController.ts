@@ -59,6 +59,10 @@ class UserController {
             { new: true }
         );
     }
+
+    async deleteAccount(userId: string) {
+        return await UserModel.findByIdAndDelete(userId);
+    }
 }
 
 export default new UserController();
