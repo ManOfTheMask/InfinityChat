@@ -282,6 +282,27 @@ export async function encryptChatMessage(message, recipientPublicKeyArmored, sen
 }
 
 /**
+ * Encrypts a message to a group: accepts an array of armored public keys (the key ring)
+ * so any member can decrypt the message with their own private key.
+ * @async
+ * @param {string} message - The plaintext message.
+ * @param {string[]} armoredPublicKeys - Array of armored PGP public keys for all group members.
+ * @returns {Promise<string>} - The armored encrypted message.
+ */
+export async function encryptGroupMessage(message, armoredPublicKeys) {
+    if (!message || !armoredPublicKeys || armoredPublicKeys.length === 0) {
+        throw new Error('Message and at least one public key are required.');
+    }
+    const encryptionKeys = await Promise.all(
+        armoredPublicKeys.map(k => openpgp.readKey({ armoredKey: k }))
+    );
+    return await openpgp.encrypt({
+        message: await openpgp.createMessage({ text: message }),
+        encryptionKeys,
+    });
+}
+
+/**
  * Decrypts a chat message using an armored private key string and passphrase.
  * @async
  * @param {string} armoredMessage - The armored encrypted message.

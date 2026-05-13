@@ -4,7 +4,7 @@ import mongoose from "mongoose";
 class NotificationController {
     async create(
         userId: string,
-        type: "friend_request" | "message",
+        type: "friend_request" | "message" | "group_invite",
         title: string,
         body: string,
         link: string,

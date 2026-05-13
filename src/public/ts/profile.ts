@@ -230,3 +230,89 @@ saveBtn.addEventListener('click', async () => {
         saveBtn.textContent = 'Save';
     }
 });
+
+// ── Delete account ────────────────────────────────────────────────────────────
+const deleteAccountModal      = document.getElementById('deleteAccountModal')      as HTMLDialogElement;
+const deleteAccountBtn        = document.getElementById('deleteAccountBtn')        as HTMLButtonElement;
+const deleteAccountConfirmBtn = document.getElementById('deleteAccountConfirmBtn') as HTMLButtonElement;
+const deleteAccountCancelBtn  = document.getElementById('deleteAccountCancelBtn')  as HTMLButtonElement;
+const deleteKeyFile           = document.getElementById('deleteKeyFile')           as HTMLInputElement;
+const deletePassphrase        = document.getElementById('deletePassphrase')        as HTMLInputElement;
+const deleteAccountError      = document.getElementById('deleteAccountError')      as HTMLParagraphElement;
+
+deleteAccountBtn.addEventListener('click', () => {
+    deleteKeyFile.value = '';
+    deletePassphrase.value = '';
+    deleteAccountError.classList.add('hidden');
+    deleteAccountModal.showModal();
+});
+
+deleteAccountCancelBtn.addEventListener('click', () => deleteAccountModal.close());
+
+deleteAccountConfirmBtn.addEventListener('click', async () => {
+    deleteAccountError.classList.add('hidden');
+
+    const file = deleteKeyFile.files?.[0];
+    const passphrase = deletePassphrase.value;
+
+    if (!file) {
+        deleteAccountError.textContent = 'Please select your private key file.';
+        deleteAccountError.classList.remove('hidden');
+        return;
+    }
+    if (!passphrase) {
+        deleteAccountError.textContent = 'Please enter your passphrase.';
+        deleteAccountError.classList.remove('hidden');
+        return;
+    }
+
+    let privateKeyArmored: string;
+    try {
+        privateKeyArmored = await file.text();
+    } catch {
+        deleteAccountError.textContent = 'Failed to read key file.';
+        deleteAccountError.classList.remove('hidden');
+        return;
+    }
+
+    deleteAccountConfirmBtn.disabled = true;
+    deleteAccountConfirmBtn.textContent = 'Deleting…';
+
+    try {
+        const res = await fetch('/profile/account', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ privateKeyArmored, passphrase }),
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message);
+
+        // Replace modal content with success message + countdown
+        deleteAccountModal.querySelector('.modal-box')!.innerHTML = `
+            <h3 class="font-bold text-lg">Account Deleted</h3>
+            <p class="text-sm text-base-content/70 mt-2">
+                Your account and all associated data have been permanently deleted.
+            </p>
+            <div class="alert alert-warning mt-4 text-sm">
+                <span>⚠️ <strong>Remember to delete your private key file</strong> from your device — it can no longer be used to log in but should still be kept off disk.</span>
+            </div>
+            <p class="text-sm text-base-content/50 mt-4">Redirecting to home in <span id="deleteCountdown">30</span>s…</p>
+        `;
+
+        let remaining = 30;
+        const countdownEl = deleteAccountModal.querySelector<HTMLSpanElement>('#deleteCountdown')!;
+        const interval = setInterval(() => {
+            remaining -= 1;
+            countdownEl.textContent = String(remaining);
+            if (remaining <= 0) {
+                clearInterval(interval);
+                window.location.href = '/';
+            }
+        }, 1000);
+    } catch (err: any) {
+        deleteAccountError.textContent = err.message ?? 'Failed to delete account.';
+        deleteAccountError.classList.remove('hidden');
+        deleteAccountConfirmBtn.disabled = false;
+        deleteAccountConfirmBtn.textContent = 'Delete My Account';
+    }
+});

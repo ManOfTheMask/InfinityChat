@@ -28,12 +28,15 @@
 
     <!-- Sidebar: conversation list -->
     <aside id="sidebar" class="w-72 flex-shrink-0 bg-base-100 border-r border-base-300 flex flex-col">
-        <div class="p-4 border-b border-base-300 flex items-center justify-between">
+        <div class="p-4 border-b border-base-300 flex items-center justify-between gap-2">
             <h2 class="text-lg font-bold">Chats</h2>
-            <button id="newChatBtn" class="btn btn-primary btn-sm">+ New Chat</button>
+            <div class="flex gap-1">
+                <button id="newChatBtn" class="btn btn-primary btn-sm">+ DM</button>
+                <button id="newGroupBtn" class="btn btn-secondary btn-sm">👥 Group</button>
+            </div>
         </div>
 
-        <!-- New chat friend picker (hidden by default) -->
+        <!-- New DM friend picker (hidden by default) -->
         <div id="friendPicker" class="hidden p-3 border-b border-base-300 bg-base-200">
             <p class="text-xs text-base-content/60 mb-2">Select a friend to message</p>
             <ul id="friendPickerList" class="flex flex-col gap-1 max-h-48 overflow-y-auto">
@@ -47,13 +50,18 @@
                 {{#each conversations}}
                 <li class="conversation-item flex items-center gap-2 px-4 py-3 cursor-pointer hover:bg-base-200 border-b border-base-300/50 group"
                     data-id="{{this.id}}"
+                    data-type="{{this.type}}"
+                    data-admin-id="{{this.adminId}}"
                     data-pinned="{{this.pinned}}">
                     <div class="flex-1 min-w-0">
                         <div class="flex items-center gap-1">
                             {{#if this.pinned}}
                             <span class="text-warning text-xs" title="Pinned">📌</span>
                             {{/if}}
-                            <span class="font-medium truncate">{{this.otherUsername}}</span>
+                            {{#if (eq this.type "group")}}
+                            <span class="text-xs" title="Group chat">👥</span>
+                            {{/if}}
+                            <span class="font-medium truncate"{{#if (eq this.type "group")}} data-member-list="{{this.memberList}}"{{/if}}>{{this.otherUsername}}</span>
                         </div>
                         {{#if this.lastMessageAt}}
                         <p class="text-xs text-base-content/40 truncate">{{this.lastMessageAt}}</p>
@@ -82,7 +90,12 @@
                     <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
             </button>
-            <span id="chatHeaderName" class="font-semibold text-lg text-base-content/40 italic flex-1">Select a chat</span>
+            <span id="chatHeaderName" class="font-semibold text-lg text-base-content/40 italic flex-1 truncate">Select a chat</span>
+            <!-- Group-only buttons (shown when a group is active) -->
+            <button id="renameGroupHeaderBtn" class="btn btn-ghost btn-sm hidden" title="Rename group">✏️</button>
+            <button id="groupMembersBtn" class="btn btn-ghost btn-sm hidden" title="Members">
+                👥 Members
+            </button>
             <button id="closeChatBtn" class="btn btn-ghost btn-sm hidden" title="Close chat">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -109,9 +122,87 @@
             <button id="sendBtn" disabled class="btn btn-primary self-end disabled:opacity-40">Send</button>
         </div>
     </div>
+
+    <!-- Group members panel (slides in from right) -->
+    <aside id="groupMembersPanel" class="hidden w-64 flex-shrink-0 bg-base-100 border-l border-base-300 flex flex-col">
+        <div class="p-4 border-b border-base-300 flex items-center justify-between gap-2">
+            <h3 class="font-bold text-sm truncate flex-1" id="membersPanelTitle">Members</h3>
+            <button id="renameGroupBtn" class="btn btn-ghost btn-xs shrink-0" title="Rename group">✏️</button>
+            <button id="closeMembersPanel" class="btn btn-ghost btn-xs shrink-0">✕</button>
+        </div>
+        <ul id="membersList" class="flex-1 overflow-y-auto p-2 flex flex-col gap-1">
+        </ul>
+        <div class="p-3 border-t border-base-300 flex flex-col gap-2">
+            <button id="addMemberBtn" class="btn btn-sm btn-outline w-full">+ Add Member</button>
+            <button id="leaveGroupBtn" class="btn btn-sm btn-error btn-outline w-full">Leave Group</button>
+            <button id="deleteGroupBtn" class="btn btn-sm btn-error w-full hidden">🗑 Delete Group</button>
+        </div>
+    </aside>
 </div>
 
-<!-- Close chat modal -->
+<!-- New group creation modal -->
+<dialog id="newGroupModal" class="modal">
+    <div class="modal-box flex flex-col gap-4 max-w-sm w-full">
+        <h3 class="font-bold text-lg">Create Group Chat</h3>
+        <div class="form-control gap-1">
+            <label class="label"><span class="label-text text-sm">Group name <span class="opacity-50">(optional)</span></span></label>
+            <input id="groupNameInput" type="text" placeholder="e.g. Movie Night" maxlength="40" class="input input-bordered w-full" />
+        </div>
+        <div class="form-control gap-1">
+            <label class="label"><span class="label-text text-sm">Add members <span class="opacity-50">(up to 9 friends)</span></span></label>
+            <ul id="groupFriendPickerList" class="flex flex-col gap-1 max-h-48 overflow-y-auto border border-base-300 rounded-lg p-2 bg-base-200">
+                <li class="text-xs text-base-content/40 italic">Loading friends...</li>
+            </ul>
+        </div>
+        <p id="groupCreateError" class="text-error text-sm hidden"></p>
+        <div class="modal-action flex gap-2 mt-0">
+            <button id="groupCreateBtn" class="btn btn-primary flex-1">Create</button>
+            <button id="groupCreateCancelBtn" class="btn btn-ghost flex-1">Cancel</button>
+        </div>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
+<!-- Add member to group modal -->
+<dialog id="addMemberModal" class="modal">
+    <div class="modal-box flex flex-col gap-4 max-w-sm w-full">
+        <h3 class="font-bold text-lg">Add Member</h3>
+        <p class="text-xs text-base-content/60">Search by username or paste a public key to invite anyone, or pick from your friends.</p>
+        <div class="form-control gap-1">
+            <label class="label"><span class="label-text text-sm">Username</span></label>
+            <input id="addMemberUsernameInput" type="text" placeholder="Username" class="input input-bordered w-full" />
+        </div>
+        <p class="text-xs text-base-content/40 text-center">— or pick from friends —</p>
+        <ul id="addMemberFriendList" class="flex flex-col gap-1 max-h-40 overflow-y-auto border border-base-300 rounded-lg p-2 bg-base-200">
+            <li class="text-xs text-base-content/40 italic">Loading...</li>
+        </ul>
+        <p id="addMemberError" class="text-error text-sm hidden"></p>
+        <div class="modal-action flex gap-2 mt-0">
+            <button id="addMemberConfirmBtn" class="btn btn-primary flex-1">Add</button>
+            <button id="addMemberCancelBtn" class="btn btn-ghost flex-1">Cancel</button>
+        </div>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
+<!-- Rename group modal -->
+<dialog id="renameGroupModal" class="modal">
+    <div class="modal-box flex flex-col gap-4 max-w-sm w-full">
+        <h3 class="font-bold text-lg">Rename Group</h3>
+        <div class="form-control gap-1">
+            <label class="label"><span class="label-text text-sm">New name <span class="opacity-50">(leave blank to show member list)</span></span></label>
+            <input id="renameGroupInput" type="text" placeholder="e.g. Movie Night" maxlength="40" class="input input-bordered w-full" />
+        </div>
+        <p id="renameGroupError" class="text-error text-sm hidden"></p>
+        <div class="modal-action flex gap-2 mt-0">
+            <button id="renameGroupConfirmBtn" class="btn btn-primary flex-1">Save</button>
+            <button id="renameGroupCancelBtn" class="btn btn-ghost flex-1">Cancel</button>
+        </div>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
+<!-- Close DM modal -->
 <dialog id="closeChatModal" class="modal">
     <div class="modal-box flex flex-col gap-4">
         <h3 class="font-bold text-lg">Close this chat?</h3>

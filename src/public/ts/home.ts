@@ -72,10 +72,13 @@ document.getElementById('pending-list')?.addEventListener('click', async (e) => 
 // ── Mark all notifications read ───────────────────────────────────────────────
 document.getElementById('mark-all-read-btn')?.addEventListener('click', async () => {
     try {
-        await fetch('/notifications/read-all', { method: 'POST' });
-        document.querySelectorAll<HTMLLIElement>('#notif-list li').forEach(li => {
-            li.classList.remove('border-l-2', 'border-primary');
-        });
+        const res = await fetch('/notifications/read-all', { method: 'POST' });
+        if (!res.ok) throw new Error();
+        const notifList = document.getElementById('notif-list');
+        if (notifList) {
+            notifList.replaceWith(emptyState('All caught up'));
+        }
+        document.getElementById('mark-all-read-btn')?.remove();
         showToast('All notifications marked as read.', 'success');
     } catch {
         showToast('Network error.', 'error');
