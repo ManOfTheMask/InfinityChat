@@ -21,6 +21,7 @@ KeepQuiet is a self-hostable, end-to-end encrypted messaging application. All en
 - **Message deletion** — soft-delete individual messages; deleted messages show a placeholder to all participants
 - **Dashboard** — logged-in users see a summary of stats (friend count, messages sent, unread notifications, pending requests), quick-action buttons, and an inline accept/decline panel for incoming friend requests
 - **Profile page** — displays your username, member-since date, and your full ASCII-armored PGP public key with a one-click copy-to-clipboard button
+- **Profile pictures (avatars)** — upload/crop a profile picture from the profile page; avatars are shown on the dashboard and in chat
 
 ---
 
@@ -93,6 +94,7 @@ Connections that miss two consecutive pings are terminated automatically.
 | `publicKey` | string | fingerprint; unique |
 | `publicKeyArmored` | string | full ASCII-armored public key |
 | `friends` | ObjectId[] | references User |
+| `profilePicture` | string \| null | base64 image data URL |
 | `createdAt` | datetime | |
 | `updatedAt` | datetime | |
 
@@ -119,7 +121,7 @@ Connections that miss two consecutive pings are terminated automatically.
 |---|---|---|
 | `fromUserId` | ObjectId | references User |
 | `toUserId` | ObjectId | references User |
-| `status` | enum | `pending` only — records are deleted when accepted or declined |
+| `status` | enum | `pending`, `accepted`, `declined` (app flow deletes accepted/declined requests) |
 | `createdAt` | datetime | |
 
 ### Notification
@@ -142,6 +144,8 @@ Connections that miss two consecutive pings are terminated automatically.
 |---|---|---|
 | `GET` | `/` | Home / dashboard (stats + quick actions when logged in) |
 | `GET` | `/profile` | Profile page (username, member since, armored public key) |
+| `GET` | `/friends` | Friends page (friends list + incoming requests) |
+| `GET` | `/chat` | Chat page (conversation list + message view) |
 
 ### Auth / User
 | Method | Path | Description |
@@ -154,6 +158,8 @@ Connections that miss two consecutive pings are terminated automatically.
 | `GET` | `/signup/import` | Import an existing PGP key |
 | `POST` | `/signup/generate` | Register with a generated key |
 | `POST` | `/signup/import` | Register with an imported key |
+| `POST` | `/profile/avatar` | Upload or update your profile picture (base64 data URL) |
+| `GET` | `/user/:userId/avatar` | Get a user avatar (used by the chat UI) |
 | `POST` | `/logout` | Destroy session |
 
 ### Friends
@@ -170,12 +176,12 @@ Connections that miss two consecutive pings are terminated automatically.
 |---|---|---|
 | `GET` | `/chat` | Chat page (lists all conversations) |
 | `POST` | `/chat/start` | Get or create a conversation with a friend |
-| `GET` | `/chat/:id/messages` | Load messages for a conversation |
-| `POST` | `/chat/:id/messages` | Send a message |
-| `DELETE` | `/chat/:id/messages/:msgId` | Soft-delete a message |
-| `POST` | `/chat/:id/pin` | Toggle pin for a conversation |
-| `DELETE` | `/chat/:id` | Close (and optionally delete messages in) a conversation |
-| `GET` | `/chat/:id/recipient-key` | Fetch the recipient's public key for encryption |
+| `GET` | `/chat/:conversationId/messages` | Load messages for a conversation |
+| `POST` | `/chat/:conversationId/messages` | Send a message |
+| `DELETE` | `/chat/:conversationId/messages/:messageId` | Soft-delete a message |
+| `POST` | `/chat/:conversationId/pin` | Toggle pin for a conversation |
+| `DELETE` | `/chat/:conversationId` | Close (and optionally delete messages in) a conversation |
+| `GET` | `/chat/:conversationId/recipient-key` | Fetch the recipient's public key for encryption |
 
 ### Notifications
 | Method | Path | Description |
