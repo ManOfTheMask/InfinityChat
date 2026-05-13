@@ -1,6 +1,23 @@
 // @ts-ignore
 import { encryptChatMessage, decryptMessageWithKey } from '../jslibs/PGPUtils.js';
 
+// ── Avatar cache ──────────────────────────────────────────────────────────────
+const avatarCache = new Map<string, string | null>();
+
+async function fetchAvatar(userId: string): Promise<string | null> {
+    if (avatarCache.has(userId)) return avatarCache.get(userId)!;
+    try {
+        const res = await fetch(`/user/${userId}/avatar`);
+        const data = await res.json();
+        const url: string | null = data.success && data.profilePicture ? data.profilePicture : null;
+        avatarCache.set(userId, url);
+        return url;
+    } catch {
+        avatarCache.set(userId, null);
+        return null;
+    }
+}
+
 // ── State ─────────────────────────────────────────────────────────────────────
 let activeConversationId: string | null = null;
 let activeReceiverPublicKey: string | null = null;
@@ -134,6 +151,7 @@ async function openConversation(id: string, item: HTMLElement) {
     }
 
     renderedMessageIds.clear();
+    avatarCache.clear();
     loadMessages(id);
 }
 
@@ -194,9 +212,22 @@ async function buildMessageEl(msg: {
         decryptFailed = true;
     }
 
+    // Fetch avatar (uses cache after first load)
+    const avatarUrl = await fetchAvatar(msg.senderId);
+
     const li = document.createElement('div');
     li.className = `flex flex-col ${isMine ? 'items-end' : 'items-start'} group`;
     li.dataset.messageId = msg.id;
+
+    // Row: avatar + bubble
+    const row = document.createElement('div');
+    row.className = `flex items-end gap-2 ${isMine ? 'flex-row-reverse' : 'flex-row'}`;
+
+    // Avatar
+    const avatar = document.createElement('img');
+    avatar.className = 'w-7 h-7 rounded-full object-cover flex-shrink-0 self-end';
+    avatar.alt = escHtml(msg.senderUsername);
+    avatar.src = avatarUrl ?? '/img/profileplaceholder.jpg';
 
     const bubble = document.createElement('div');
     bubble.className = `relative max-w-sm px-4 py-2 rounded-2xl text-sm shadow
@@ -218,11 +249,14 @@ async function buildMessageEl(msg: {
         bubble.appendChild(delBtn);
     }
 
+    row.appendChild(avatar);
+    row.appendChild(bubble);
+
     const time = document.createElement('span');
     time.className = 'text-xs text-base-content/30 mt-1 px-1';
     time.textContent = msg.createdAt;
 
-    li.appendChild(bubble);
+    li.appendChild(row);
     li.appendChild(time);
     return li;
 }

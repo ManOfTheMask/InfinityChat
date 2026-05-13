@@ -195,6 +195,7 @@ app.get('/', async (req: Request, res: Response) => {
             script: 'home',
             loggedIn: true,
             username: user.username,
+            profilePicture: (user as any).profilePicture ?? null,
             friendsCount: (user.friends ?? []).length,
             pendingCount: pendingRequests.length,
             unreadCount,
@@ -225,10 +226,50 @@ app.get('/profile', requireAuth, async (req: Request, res: Response) => {
             username: user.username,
             publicKey: user.publicKey,
             createdAt: user.createdAt.toLocaleDateString(),
+            profilePicture: (user as any).profilePicture ?? null,
         });
     } catch (error) {
         console.error('Error fetching profile:', error);
         res.status(500).send('Internal server error.');
+    }
+});
+
+// Upload / update profile picture (receives a base64 data URL of the cropped image)
+app.post('/profile/avatar', requireAuth, async (req: Request, res: Response) => {
+    const { dataUrl } = req.body;
+    if (!dataUrl || typeof dataUrl !== 'string') {
+        res.status(400).json({ success: false, message: 'dataUrl is required.' });
+        return;
+    }
+    // Only allow image data URLs
+    if (!dataUrl.startsWith('data:image/')) {
+        res.status(400).json({ success: false, message: 'Invalid image format.' });
+        return;
+    }
+    // Cap at ~200 KB of base64 (256x256 JPEG is typically ~15 KB)
+    if (dataUrl.length > 200_000) {
+        res.status(400).json({ success: false, message: 'Image is too large.' });
+        return;
+    }
+    try {
+        await UserController.updateProfilePicture(req.session.userId!, dataUrl);
+        res.json({ success: true });
+    } catch (error: any) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// Return a user's avatar by their id (used by the chat UI)
+app.get('/user/:userId/avatar', requireAuth, async (req: Request, res: Response) => {
+    try {
+        const user = await UserController.getUserById(req.params.userId);
+        if (!user) {
+            res.status(404).json({ success: false, message: 'User not found.' });
+            return;
+        }
+        res.json({ success: true, profilePicture: (user as any).profilePicture ?? null });
+    } catch (error: any) {
+        res.status(500).json({ success: false, message: error.message });
     }
 });
 

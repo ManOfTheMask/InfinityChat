@@ -51,6 +51,14 @@ class UserController {
             throw error;
         }
     }
+
+    async updateProfilePicture(userId: string, dataUrl: string) {
+        return await UserModel.findByIdAndUpdate(
+            userId,
+            { profilePicture: dataUrl, updatedAt: Date.now() },
+            { new: true }
+        );
+    }
 }
 
 export default new UserController();
