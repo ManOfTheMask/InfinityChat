@@ -3,9 +3,16 @@
 <div class="flex-1 w-full max-w-5xl mx-auto px-3 py-4 sm:px-6 sm:py-6">
 
     {{!-- Greeting --}}
-    <div class="mb-4">
-        <h1 class="text-2xl sm:text-3xl font-bold text-base-content leading-tight">Welcome back, <span class="text-primary">{{username}}</span></h1>
-        <p class="text-base-content/50 text-xs mt-0.5">Member since {{memberSince}}</p>
+    <div class="mb-4 flex items-center gap-3">
+        {{#if profilePicture}}
+        <img src="{{profilePicture}}" alt="{{username}}" class="w-12 h-12 rounded-full object-cover shadow-md shrink-0">
+        {{else}}
+        <img src="/img/profileplaceholder.jpg" alt="{{username}}" class="w-12 h-12 rounded-full object-cover shadow-md shrink-0">
+        {{/if}}
+        <div>
+            <h1 class="text-2xl sm:text-3xl font-bold text-base-content leading-tight">Welcome back, <span class="text-primary">{{username}}</span></h1>
+            <p class="text-base-content/50 text-xs mt-0.5">Member since {{memberSince}}</p>
+        </div>
     </div>
 
     {{!-- Two-column layout on lg+: stats left, content right --}}
