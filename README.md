@@ -22,6 +22,8 @@ KeepQuiet is a self-hostable, end-to-end encrypted messaging application. All en
 - **Dashboard** — logged-in users see a summary of stats (friend count, messages sent, unread notifications, pending requests), quick-action buttons, and an inline accept/decline panel for incoming friend requests
 - **Profile page** — displays your username, member-since date, and your full ASCII-armored PGP public key with a one-click copy-to-clipboard button
 - **Profile pictures (avatars)** — upload/crop a profile picture from the profile page; avatars are shown on the dashboard and in chat
+- **Group chats** — multi-participant E2EE conversations with up to 10 members; each member's public key forms a shared key ring so messages are encrypted for every participant; members can invite others, leave, or rename the group; the group admin can kick members and delete the group
+- **Account deletion** — permanently delete your account (requires PGP key + passphrase verification); cleans up all associated data including friends, DMs, group memberships, and notifications
 
 ---
 
@@ -55,9 +57,24 @@ KeepQuiet uses a **PGP challenge-response** flow instead of passwords:
 - Each notification has a **Mark read** button and a **Dismiss** button (permanently deletes the notification).
 - **Mark all read** clears the badge in one click.
 
+### Group Chats
+- Groups can have 2–10 members; each member's public key is stored in the group's **key ring** at join time.
+- When sending a message, the client encrypts the content with every member's public key so that each participant can decrypt it.
+- Any member can invite a friend (who must have a stored PGP key), rename the group, leave, or pin the group.
+- The admin can additionally kick members and delete the group entirely.
+- If a member leaves or is kicked, their messages are soft-deleted and their key is removed from the ring.
+- If the admin leaves, the longest-standing remaining member is automatically promoted.
+- Deleting the group hard-deletes all group messages and the group document.
+
+### Account Deletion
+- Users can permanently delete their account from the Profile page.
+- Deletion requires uploading the private key and entering the passphrase to verify ownership.
+- All associated data is cleaned up: friend links, friend requests, notifications, DMs, and group memberships (including admin handoff or group deletion if the user was the last member).
+
 ### Real-time (WebSockets)
 All real-time communication goes through a single WebSocket endpoint at `/ws`. The server authenticates the connection by reading and verifying the session cookie on the initial HTTP upgrade request.
 
+#### DM events
 | Direction | Event type | Payload |
 |---|---|---|
 | Server → Client | `new_message` | `{ conversationId, message: { id, senderUsername, senderId, content, deleted, createdAt } }` |
@@ -65,6 +82,16 @@ All real-time communication goes through a single WebSocket endpoint at `/ws`. T
 | Server → Client | `message_deleted` | `{ conversationId, messageId }` |
 | Server → Client | `__ping__` | keepalive ping (string literal) |
 | Client → Server | `__pong__` | keepalive response (string literal) |
+
+#### Group events
+| Direction | Event type | Payload |
+|---|---|---|
+| Server → Client | `new_group_message` | `{ groupId, message: { id, senderUsername, senderId, content, deleted, createdAt } }` |
+| Server → Client | `group_message_deleted` | `{ groupId, messageId }` |
+| Server → Client | `group_member_added` | `{ groupId, userId, username }` |
+| Server → Client | `group_member_removed` | `{ groupId, userId }` |
+| Server → Client | `group_deleted` | `{ groupId }` |
+| Server → Client | `group_renamed` | `{ groupId, name }` |
 
 Connections that miss two consecutive pings are terminated automatically.
 
@@ -128,11 +155,30 @@ Connections that miss two consecutive pings are terminated automatically.
 | Field | Type | Notes |
 |---|---|---|
 | `userId` | ObjectId | recipient; references User |
-| `type` | enum | `friend_request`, `message` |
+| `type` | enum | `friend_request`, `message`, `group_invite` |
 | `title` | string | short heading shown in the bell dropdown |
 | `body` | string | optional detail text |
 | `link` | string | where the "Open" button navigates |
 | `read` | boolean | `false` until marked read |
+| `createdAt` | datetime | |
+
+### GroupConversation
+| Field | Type | Notes |
+|---|---|---|
+| `name` | string \| null | optional display name; falls back to member list |
+| `adminId` | ObjectId | references User; the group creator/current admin |
+| `members` | `{ userId: ObjectId, publicKeyArmored: string }[]` | 1–10 entries; forms the encryption key ring |
+| `pinnedBy` | ObjectId[] | users who pinned this group |
+| `lastMessageAt` | datetime \| null | used for sorting |
+| `createdAt` | datetime | |
+
+### GroupMessage
+| Field | Type | Notes |
+|---|---|---|
+| `groupId` | ObjectId | references GroupConversation |
+| `senderId` | ObjectId | references User |
+| `content` | string | PGP-encrypted ciphertext (encrypted for every member's key) |
+| `deletedAt` | datetime | set when soft-deleted; `null` otherwise |
 | `createdAt` | datetime | |
 
 ---
@@ -160,6 +206,8 @@ Connections that miss two consecutive pings are terminated automatically.
 | `POST` | `/signup/import` | Register with an imported key |
 | `POST` | `/profile/avatar` | Upload or update your profile picture (base64 data URL) |
 | `GET` | `/user/:userId/avatar` | Get a user avatar (used by the chat UI) |
+| `GET` | `/user/search` | Search for a user by exact username (used by group invite) |
+| `DELETE` | `/profile/account` | Permanently delete your account (requires private key + passphrase) |
 | `POST` | `/logout` | Destroy session |
 
 ### Friends
@@ -190,6 +238,22 @@ Connections that miss two consecutive pings are terminated automatically.
 | `POST` | `/notifications/read-all` | Mark all notifications as read |
 | `POST` | `/notifications/:id/read` | Mark a single notification as read |
 | `DELETE` | `/notifications/:id` | Dismiss (permanently delete) a notification |
+
+### Group Chats
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/group/create` | Create a new group with a name and initial member list |
+| `GET` | `/group/:groupId/info` | Get group info (name, admin, member list) |
+| `GET` | `/group/:groupId/keyring` | Get the array of armored public keys for all members |
+| `GET` | `/group/:groupId/messages` | Load messages for a group |
+| `POST` | `/group/:groupId/messages` | Send a message to a group |
+| `DELETE` | `/group/:groupId/messages/:messageId` | Soft-delete a group message (sender only) |
+| `POST` | `/group/:groupId/invite` | Invite a user to the group (any member) |
+| `DELETE` | `/group/:groupId/members/:memberId` | Kick a member (admin only) |
+| `POST` | `/group/:groupId/leave` | Leave the group |
+| `POST` | `/group/:groupId/pin` | Toggle pin for the group |
+| `PATCH` | `/group/:groupId/name` | Rename the group (any member) |
+| `DELETE` | `/group/:groupId` | Delete the group entirely (admin only) |
 
 ---
 
@@ -229,7 +293,7 @@ Connections that miss two consecutive pings are terminated automatically.
 ## Upcoming Features
 
 - ~~**Theme picker** — let users choose from DaisyUI's built-in themes or customise accent colours~~
-- **Group chats** — multi-participant conversations with shared group key management up to 10 people
+- ~~**Group chats** — multi-participant conversations with shared group key management up to 10 people~~
 - **Message reactions** — emoji reactions on individual messages
 - **Read receipts** — show when a message has been seen by the recipient
 - **File / image sharing** — encrypted attachment support
